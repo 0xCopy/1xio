@@ -3,6 +3,7 @@ package hideftvads.proto;
 import junit.framework.*;
 
 import java.nio.*;
+import java.io.*;
 
 /**
  * User: jim
@@ -33,9 +34,13 @@ public class HttpMethodTest extends TestCase {
 
                 indexEntries.mark().position(0);
 
-                int index = 0; 
-                
-                HttpMethod.decodeTokens(indexEntries, httpMethod, index);
+                int index = 0;
+
+                try {
+                    httpMethod.decodeTokens(indexEntries, httpMethod, index);
+                } catch (IOException e) {
+                    fail();
+                }
                 return;
             }
         }
