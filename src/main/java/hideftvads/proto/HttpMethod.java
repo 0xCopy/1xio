@@ -24,10 +24,18 @@ public enum HttpMethod implements Protocol {
         @Override
         public void onWrite(SelectionKey key) {
 
-            final Object o = key.attachment();
+            final Future<Long> o = (Future<Long>) key.attachment();
 
+            try {
+
+                if (o.isDone()) {
+
+                    key.channel().close();
+                }
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
         }
-
         /**
          * enrolls a new SelectionKey to the methods
          *
@@ -37,6 +45,7 @@ public enum HttpMethod implements Protocol {
         @Override
         public void onConnect(final SelectionKey key) throws IOException, IOError {
             PoolContext.enter();
+
             try {
                 final Object o = key.attachment();
                 assert o instanceof ByteBuffer;
@@ -54,22 +63,11 @@ public enum HttpMethod implements Protocol {
 
                     RandomAccessFile f = new RandomAccessFile(fnode, "r");
 
-
                     final long fileLength = f.length();
-//                    final long progres = 0;
                     final FileChannel fc = f.getChannel();
-
-//                    fc.transferTo(0,fileLength, (WritableByteChannel) key.channel());
-
                     final SelectableChannel channel = key.channel();
-
-
                     final Callable<Long> callable = new Callable<Long>() {
                         public long progres;
-
-                        private long getRemaining() {
-                            return fileLength - progres;
-                        }
 
                         public boolean done;
 
@@ -79,88 +77,49 @@ public enum HttpMethod implements Protocol {
                             try {
 
                                 final long remaining = fileLength - progres;
-                                if (remaining == 0) done = true;
-                                progres += fc.transferTo(progres, remaining, (WritableByteChannel) channel);
+                                if (remaining == 0) {
+                                    done = true;
+                                    fc.close();
+                                    channel.close();
+                                    ;
+                                }
+                                System.err.println("call: remaining: " + remaining);
+
+                                final long written = fc.transferTo(progres, remaining, (WritableByteChannel) channel);
+                                progres += written;
+                                System.err.println("call: wrote: " + written);
 
                                 return progres;
+
                             } catch (IOException e) {
-                                e.printStackTrace();  //TODO: Verify for a purpose
+                                e.printStackTrace();
                                 return -1L;
                             }
                         }
                     };
 
 
-                    final Future<Long> future;
-                    future = new Future<Long>() {
-                        public boolean canceled;
-
-                        @Override
-                        public boolean cancel(boolean b) {
-
-                            key.cancel();  //ToDo: verify for a purpose
-                            try {
-                                channel.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();  //TODO: Verify for a purpose
-                            }
-                            try {
-                                fc.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();  //TODO: Verify for a purpose
-                            }
-                            canceled = true;
-                            return true;
-                        }
-
-                        @Override
-                        public boolean isCancelled() {
-                            return canceled;  //ToDo: verify for a purpose
-                        }
-
-                        /**
-                         * same as calling get
-                         *
-                         * @return
-                         */
-                        @Override
-                        public boolean isDone() {
-                            try {
-                                return callable.call() == fileLength;
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                cancel(true);
-                            }
-                            return false;
-                        }
+                    SocketChannel c = (SocketChannel) channel;
+                    final TextBuilder builder = TextBuilder.newInstance();
+                    final String s = "HTTP/1.1 200 OK\n" + "Content-Length: " + fileLength + "\n\n";
 
 
-                        @Override
-                        public Long get() throws InterruptedException, ExecutionException {
-                            try {
-                                return callable.call();
-                            } catch (Exception e) {
-                                e.printStackTrace();  //TODO: Verify for a purpose
-                                cancel(true);
-                            }
-                            return -1L;
-                        }
+                    c.write(ByteBuffer.wrap(s.getBytes()));
 
-                        @Override
-                        public Long get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException {
 
-                            throw new UnsupportedOperationException(fname);
-                        }
-                    };
-                    channel.register(selector, SelectionKey.OP_WRITE, future);
+                    final Future<Long> longFuture = REACTOR.submit(callable);
+                    final SelectionKey selectionKey = channel.register(selector, SelectionKey.OP_WRITE, longFuture);
 
                 }
+            } catch (Exception e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
             } finally {
                 PoolContext.exit();
             }
 
         }
     }, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION;
+    private static final ExecutorService REACTOR = Executors.newCachedThreadPool();
 
 
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
