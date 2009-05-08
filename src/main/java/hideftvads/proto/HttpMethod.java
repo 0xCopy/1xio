@@ -21,21 +21,6 @@ import java.util.concurrent.*;
 public enum HttpMethod implements Protocol {
     GET {
 
-        @Override
-        public void onWrite(SelectionKey key) {
-
-            final Future<Long> o = (Future<Long>) key.attachment();
-
-            try {
-
-                if (o.isDone()) {
-
-                    key.channel().close();
-                }
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-        }
         /**
          * enrolls a new SelectionKey to the methods
          *
@@ -88,7 +73,13 @@ public enum HttpMethod implements Protocol {
                                 final long written = fc.transferTo(progres, remaining, (WritableByteChannel) channel);
                                 progres += written;
                                 System.err.println("call: wrote: " + written);
-
+                                if (remaining == 0) {
+                                    SelectionKey key = channel.keyFor(selector);
+                                    if (key != null) {
+                                        key.cancel();  //cancel the key, since already registered
+                                        
+                                    }
+                                }
                                 return progres;
 
                             } catch (IOException e) {
@@ -107,8 +98,8 @@ public enum HttpMethod implements Protocol {
                     c.write(ByteBuffer.wrap(s.getBytes()));
 
 
-                    final Future<Long> longFuture = REACTOR.submit(callable);
-                    final SelectionKey selectionKey = channel.register(selector, SelectionKey.OP_WRITE, longFuture);
+                    final Future<Long> longFuture = getReactor().submit(callable);
+                    final SelectionKey selectionKey = channel.register(selector, SelectionKey.OP_WRITE, callable);
 
                 }
             } catch (Exception e) {
@@ -119,7 +110,6 @@ public enum HttpMethod implements Protocol {
 
         }
     }, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION;
-    private static final ExecutorService REACTOR = Executors.newCachedThreadPool();
 
 
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
@@ -272,16 +262,8 @@ public enum HttpMethod implements Protocol {
                 }
             }
         };
-        final Thread thread = new Thread(initThread);
-        thread.setDaemon(true);
-        thread.setName("HidefTVAds! - " + name());
-        thread.start();
-    }
 
-    @Override
-    public void onWrite(SelectionKey key) {
-
-
+        getReactor().submit(initThread);
     }
 
     @Override
@@ -318,6 +300,20 @@ public enum HttpMethod implements Protocol {
             PoolContext.exit();
         }
 
+    }
+
+    @Override
+    public void onWrite(SelectionKey key) {
+
+        final Callable callable = (Callable) key.attachment();
+
+        final Future future = getReactor().submit(callable);
+        assert selector.isOpen();
+
+    }
+
+    public ExecutorService getReactor() {
+        return Protocol.REACTOR;
     }
 }
 

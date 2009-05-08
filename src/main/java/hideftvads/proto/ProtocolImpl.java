@@ -19,16 +19,15 @@ public abstract class ProtocolImpl implements Protocol {
     CharsetEncoder charsetEncoder = charset.newEncoder();
     CharsetDecoder decoder = charset.newDecoder();
     static boolean killswitch = false;
-                             
+
 
     Selector selector;
 
     ServerSocketChannel serverSocketChannel;
-     public ByteBuffer buffer;
-    private int port=8080;
+    public ByteBuffer buffer;
+    private int port = 8080;
 
     public ProtocolImpl() {
-        PoolContext.enter();
 
 
         try {
@@ -38,12 +37,25 @@ public abstract class ProtocolImpl implements Protocol {
             } catch (Exception e) {
                 this.buffer = ByteBuffer.allocateDirect(512);
             }
+            HttpMethod.REACTOR.submit(( new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        PoolContext.enter();
 
-            init();
-        } catch (IOException e) {
+                        init();
+                        PoolContext.exit();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();  //TODO: Verify for a purpose
+                    }
+//                    ToDo: verify for a purpose
+                }
+            }));
+
+
         }
         finally {
-            PoolContext.exit();
         }
     }
 
@@ -52,7 +64,7 @@ public abstract class ProtocolImpl implements Protocol {
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
         serverSocketChannel.configureBlocking(false);
-        SelectionKey selectionKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT,buffer);
+        SelectionKey selectionKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT, buffer);
 
         while (!killswitch) {
             selector.select(10000);
@@ -104,7 +116,6 @@ public abstract class ProtocolImpl implements Protocol {
     }
 
 
-    public int getPort(){return 8080;};
-}
+ }
 
      

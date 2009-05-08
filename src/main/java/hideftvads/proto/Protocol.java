@@ -2,6 +2,7 @@ package hideftvads.proto;
 
 import java.io.*;
 import java.nio.channels.*;
+import java.util.concurrent.*;
 
 /**
  * User: jim
@@ -10,6 +11,8 @@ import java.nio.channels.*;
  */
 public interface Protocol {
     int BUFFERSIZE = 512;
+
+    ExecutorService REACTOR = Executors.newCachedThreadPool();
 
     void onWrite(SelectionKey key);
 

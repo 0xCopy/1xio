@@ -77,8 +77,7 @@ public class HttpConnection extends ProtocolImpl {
             PoolContext.exit();
         }
     }
-
-    @Override
+  
     public int getPort() {
         return port;  //ToDo: verify for a purpose
     }
