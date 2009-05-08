@@ -1,6 +1,5 @@
 package hideftvads.proto;
 
-import javolution.context.*;
 import javolution.io.*;
 import javolution.text.*;
 
@@ -8,6 +7,7 @@ import java.io.*;
 import static java.lang.Character.*;
 import java.nio.*;
 import java.nio.channels.*;
+import static java.nio.channels.SelectionKey.*;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -29,7 +29,6 @@ public enum HttpMethod implements Protocol {
          */
         @Override
         public void onConnect(final SelectionKey key) throws IOException, IOError {
-            PoolContext.enter();
 
             try {
                 final Object o = key.attachment();
@@ -58,9 +57,7 @@ public enum HttpMethod implements Protocol {
 
                         @Override
                         public Long call() throws Exception {
-
                             try {
-
                                 final long remaining = fileLength - progres;
                                 if (remaining == 0) {
                                     done = true;
@@ -73,14 +70,16 @@ public enum HttpMethod implements Protocol {
                                 final long written = fc.transferTo(progres, remaining, (WritableByteChannel) channel);
                                 progres += written;
                                 System.err.println("call: wrote: " + written);
-                                if (remaining == 0) {
-                                    SelectionKey key = channel.keyFor(selector);
-                                    if (key != null) {
-                                        key.cancel();  //cancel the key, since already registered
-                                        
-                                    }
+                                if (remaining != 0) {
+                                    final SelectionKey selectionKey = channel.keyFor(selector);
+                                    if (selectionKey == null)
+                                        channel.register(selector, 0);
+                                    key.attach(REACTOR.submit((this)));
+                                    SelectionKey key = selectionKey.interestOps(OP_WRITE);
+                                    selector.wakeup();
+
                                 }
-                                return progres;
+                                return remaining;
 
                             } catch (IOException e) {
                                 e.printStackTrace();
@@ -89,23 +88,16 @@ public enum HttpMethod implements Protocol {
                         }
                     };
 
-
-                    SocketChannel c = (SocketChannel) channel;
-                    final TextBuilder builder = TextBuilder.newInstance();
                     final String s = "HTTP/1.1 200 OK\n" + "Content-Length: " + fileLength + "\n\n";
 
-
-                    c.write(ByteBuffer.wrap(s.getBytes()));
-
-
-                    final Future<Long> longFuture = getReactor().submit(callable);
-                    final SelectionKey selectionKey = channel.register(selector, SelectionKey.OP_WRITE, callable);
+                    ((SocketChannel) channel).write(ByteBuffer.wrap(s.getBytes()));
+                    REACTOR.submit(callable);
 
                 }
             } catch (Exception e) {
                 e.printStackTrace();  //TODO: Verify for a purpose
             } finally {
-                PoolContext.exit();
+
             }
 
         }
@@ -221,19 +213,25 @@ public enum HttpMethod implements Protocol {
             selector;
     ;
 
+    private static final Random RANDOM = new Random();
+
     {
         final Runnable initThread = new Runnable() {
             @Override
             public void run() {
-                PoolContext.enter();
+
                 try
 
                 {
 
                     System.err.println("initializing selector for " + name());
-
+                    int notice = 0;
                     while (!ProtocolImpl.killswitch) {
-                        final int num = selector.select();
+
+                        if (((notice++ % 100) == 0) && 0 == (byte) RANDOM.nextInt() % 3)
+                            System.err.println("selecting: " + name());
+                        final int num = selector.select(250);
+
                         if (num > 0) {
                             final Set<SelectionKey> selectionKeySet = selector.selectedKeys();
 
@@ -258,7 +256,7 @@ public enum HttpMethod implements Protocol {
                     e.printStackTrace();  //TODO: Verify for a purpose
                 }
                 finally {
-                    PoolContext.exit();
+
                 }
             }
         };
@@ -287,7 +285,7 @@ public enum HttpMethod implements Protocol {
      */
     @Override
     public void onConnect(SelectionKey key) throws IOException, IOError {
-        PoolContext.enter();
+
         try {
             final Object o = key.attachment();
             assert o instanceof ByteBuffer;
@@ -297,7 +295,7 @@ public enum HttpMethod implements Protocol {
             throw new UnsupportedOperationException(name() + charSequence.toString());
 
         } finally {
-            PoolContext.exit();
+
         }
 
     }
@@ -305,10 +303,16 @@ public enum HttpMethod implements Protocol {
     @Override
     public void onWrite(SelectionKey key) {
 
-        final Callable callable = (Callable) key.attachment();
+        Future<Long> writeme = (Future) key.attachment();
+        try {
+            final Long remaining = writeme.get();
 
-        final Future future = getReactor().submit(callable);
-        assert selector.isOpen();
+        } catch (InterruptedException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        } catch (ExecutionException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
+
 
     }
 

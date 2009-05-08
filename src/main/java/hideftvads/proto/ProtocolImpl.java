@@ -41,10 +41,10 @@ public abstract class ProtocolImpl implements Protocol {
                 @Override
                 public void run() {
                     try {
-                        PoolContext.enter();
+                        
 
                         init();
-                        PoolContext.exit();
+                        
 
                     } catch (IOException e) {
                         e.printStackTrace();  //TODO: Verify for a purpose

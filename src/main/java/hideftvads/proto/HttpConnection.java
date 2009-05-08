@@ -1,9 +1,6 @@
 package hideftvads.proto;
 
-import javolution.context.*;
-
 import java.io.*;
-import java.nio.*;
 import java.nio.channels.*;
 
 /**
@@ -41,7 +38,7 @@ public class HttpConnection extends ProtocolImpl {
     @Override
     public void onRead(SelectionKey key) throws IOException {
 
-        PoolContext.enter();
+        
         try {
             final SocketChannel socketChannel = (SocketChannel) key.channel();
 
@@ -55,16 +52,11 @@ public class HttpConnection extends ProtocolImpl {
              */
             for (HttpMethod method : HttpMethod.values()) {
 
-                ByteBuffer indexEntries;
-
-
-                indexEntries = (buffer);
-
 
                 for (HttpMethod httpMethod : HttpMethod.values()) {
-
-
-                    if (httpMethod.recognize(indexEntries)) {
+                    if (httpMethod.recognize((buffer))) {
+                        
+                        key.cancel();
                         httpMethod.onConnect(key);
 
                         return;
@@ -74,7 +66,7 @@ public class HttpConnection extends ProtocolImpl {
         }
         catch (Exception e2) {
         } finally {
-            PoolContext.exit();
+            
         }
     }
   
