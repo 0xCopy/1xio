@@ -24,10 +24,9 @@ public class HttpConnection extends ProtocolImpl {
      * this is where we take the input channel bytes, and write them to an output channel
      *
      * @param key
-     * @param socketChannel
      */
     @Override
-    public void onWrite(SelectionKey key, SocketChannel socketChannel) {
+    public void onWrite(SelectionKey key) {
         //ToDo: verify for a purpose
     }
 
@@ -66,7 +65,7 @@ public class HttpConnection extends ProtocolImpl {
 
 
                     if (httpMethod.recognize(indexEntries)) {
-                        httpMethod.onRead(key);
+                        httpMethod.onConnect(key);
 
                         return;
                     }

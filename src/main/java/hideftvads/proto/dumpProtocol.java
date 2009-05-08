@@ -13,7 +13,7 @@ public class dumpProtocol extends ProtocolImpl {
     private int port = 8182;
 
     @Override
-    public void onWrite(SelectionKey key, SocketChannel socketChannel) {
+    public void onWrite(SelectionKey key) {
     }
 
 

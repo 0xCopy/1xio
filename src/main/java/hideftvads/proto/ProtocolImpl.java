@@ -72,14 +72,14 @@ public abstract class ProtocolImpl implements Protocol {
                     }
 
                     if (key.isValid() && key.isWritable()) {
-                        onWrite(key, client);
+                        onWrite(key);
                     }
                 }
             }
         }
     }
 
-    abstract public void onWrite(SelectionKey key, SocketChannel socketChannel);
+    abstract public void onWrite(SelectionKey key);
 
     abstract public void onRead(SelectionKey key) throws IOException;
 

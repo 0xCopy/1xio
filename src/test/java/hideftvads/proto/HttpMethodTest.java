@@ -37,7 +37,12 @@ public class HttpMethodTest extends TestCase {
                 int index = 0;
 
                 try {
-                    httpMethod.decodeTokens(indexEntries, httpMethod, index);
+                    final CharSequence charSequence = httpMethod.methodParameters(indexEntries.duplicate());
+                    final String fname = charSequence.toString().split(" \n\t")[0];
+
+                    System.err.println("fname:" +fname);
+                         
+
                 } catch (IOException e) {
                     fail();
                 }
