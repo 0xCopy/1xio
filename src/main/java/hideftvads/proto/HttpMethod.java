@@ -22,89 +22,107 @@ public enum HttpMethod implements Protocol {
         public void onWrite(final SelectionKey key) {
             Object[] a = (Object[]) key.attachment();
             Xfer xfer = (Xfer) a[1];
-            sendChunk(key, xfer);
+            xfer.sendChunk(key, xfer);
         }
 
-        private void sendChunk(SelectionKey key, Xfer xfer) {
-            long rem = 0;
-            SocketChannel channel = null;
-            try {
-
-                channel = (SocketChannel) key.channel();
-
-                final long progress = xfer.progress;
-                rem = xfer.getRemaining();
-
-                final long written = xfer.fc.transferTo(
-                        progress, Math.min(rem, (++xfer.chunk) << 8), channel);
-
-
-                xfer.progress += written;
-
-                final CharSequence charSequence = xfer.logEntry();
-                System.err.println(charSequence);
-                System.err.flush();
-
-            } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
-                key.cancel();
-                try {
-                    key.channel().close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();   //TODO: Verify for a purpose
-                }
-            }
-            if (rem < 1) {
-                try {
-                    channel.close();
-                } catch (IOException e) {
-                    e.printStackTrace();  //TODO: Verify for a purpose
-                }
-            }
-        }
         /**
          * enrolls a new SelectionKey to the methods
          *
-         * @param oldKey
+         * @param key
          * @throws IOException
          */
         @Override
-        public void onConnect(final SelectionKey oldKey) {
+        public void onConnect(final SelectionKey key) {
 
             try {
-                assert oldKey.attachment() instanceof ByteBuffer;
-                final ByteBuffer buffer = (ByteBuffer) oldKey.attachment();
+                assert key.attachment() instanceof ByteBuffer;
+                final ByteBuffer buffer = (ByteBuffer) key.attachment();
                 final CharSequence charSequence = methodParameters(buffer);
                 final String[] strings = charSequence.toString().split(" ");
                 final String fname = strings[0];
                 final File fnode = new File("./" + fname);
-                System.err.println("attempting to open file://" + fnode.getAbsolutePath()
-                );
+                //      System.err.println("attempting to open file://" + fnode.getAbsolutePath());
 
                 if (!fnode.canRead() || !fnode.isFile()) {
-                    throw new Error("failure to read on :" + fnode.getAbsolutePath());
+
+                    key.channel().close();
                 } else {
 
                     RandomAccessFile f = new RandomAccessFile(fnode, "r");
 
                     final FileChannel fc = f.getChannel();
 
-                    final SocketChannel channel = (SocketChannel) oldKey.channel();
+                    final SocketChannel channel = (SocketChannel) key.channel();
 
                     final Xfer xfer = new Xfer(fc, fname);
-                    oldKey.interestOps(SelectionKey.OP_WRITE);
-                    oldKey.attach(new Object[]{this, xfer});
+                    String s = "HTTP/1.1 200 OK\n" +
+//                            "Content-Type: application/binary\n" +
+                            "Connection: close\n" +
+                            "Content-Length: " + fc.size() + "\n\n";
 
+                    channel.write(ByteBuffer.wrap(s.getBytes()));
 
+                    key.interestOps(SelectionKey.OP_WRITE);
+                    key.attach(new Object[]{this, xfer});
+                    return;
                 }
             } catch (FileNotFoundException e) {
                 e.printStackTrace();  //TODO: Verify for a purpose
             } catch (IOException e) {
                 e.printStackTrace();  //TODO: Verify for a purpose
             }
+            try {
+                key.channel().close();
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+            }
         }
 
         class Xfer {
+            private void sendChunk(SelectionKey key, Xfer xfer) {
+                long rem = 0;
+                SocketChannel channel = null;
+                try {
+
+                    channel = (SocketChannel) key.channel();
+
+                    final long progress = xfer.progress;
+                    rem = xfer.getRemaining();
+
+                    final long written = xfer.fc.transferTo(
+                            progress, Math.min(rem, (++xfer.chunk) << 8)
+                            , channel);
+
+
+                    xfer.progress += written;
+
+//                final CharSequence charSequence = xfer.logEntry();
+//                System.err.println(charSequence);
+//                System.err.flush();
+
+                } catch (IOException e) {
+                    e.printStackTrace();  //TODO: Verify for a purpose
+                    key.cancel();
+                    try {
+                        key.channel().close();
+                    } catch (IOException e1) {
+                        e1.printStackTrace();   //TODO: Verify for a purpose
+                    }
+                }
+                if (rem < 1) {
+                    try {
+                        fc.close();
+                    } catch (IOException e) {
+        //     e.printStackTrace();  //TODO: Verify for a purpose
+                    }
+                    try {
+                        channel.close();
+                    } catch (IOException e) {
+        //     e.printStackTrace();  //TODO: Verify for a purpose
+                    }
+                }
+            }
+
             long progress;
             FileChannel fc;
             long creation = System.currentTimeMillis();
@@ -126,8 +144,7 @@ public enum HttpMethod implements Protocol {
                 return new TextBuilder().append("Xfer: ").append(name).append(' ').append(progress).append('/').append(getRemaining());
 
             }
-        }}, //POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION
-    ;
+        }}, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION;
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
 
@@ -232,7 +249,6 @@ public enum HttpMethod implements Protocol {
     private static final Random RANDOM = new Random();
 
 
-    @Override
     public void onRead(SelectionKey key) {
         final Object o = key.attachment();
         if (o instanceof ByteBuffer) {
@@ -240,10 +256,6 @@ public enum HttpMethod implements Protocol {
         }
     }
 
-    @Override
-    public void onEnd(SelectionKey key, SocketChannel client) throws IOException {
-
-    }
 
     /**
      * enrolls a new SelectionKey to the methods

@@ -12,7 +12,7 @@ import java.nio.channels.*;
  * Date: May 6, 2009
  * Time: 11:50:22 PM
  */
-public class HttpConnection extends ProtocolImpl {
+public   class HttpConnection extends ProtocolImpl {
 
     private int port = 8080;
 
@@ -53,30 +53,34 @@ public class HttpConnection extends ProtocolImpl {
 
         try {
             Object[] p = (Object[]) key.attachment();
-            if (p != null) {
-                HttpMethod fst = (HttpMethod) p[0];
-                fst.onRead(key);
-                return;
-            } else {
+            if (p == null) {
                 final SocketChannel channel;
                 channel = (SocketChannel) key.channel();
+
+                final ByteBuffer buffer = ByteBuffer.allocateDirect(512);
                 final int i = channel.read(buffer);
-                buffer.flip().mark();
+
+              buffer.flip().mark();
 
 
-                for (HttpMethod httpMethod : HttpMethod.values()) {
+                for (HttpMethod httpMethod : HttpMethod.values())
                     if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
-                        System.err.println("found: " + httpMethod);
+                        //System.err.println("found: " + httpMethod);
                         key.attach(buffer);
                         httpMethod.onConnect(key);
                         return;
                     }
-                }
+
+                channel.close();
+                return;
             }
+
+            HttpMethod fst = (HttpMethod) p[0];
+            fst.onRead(key);
+
         } catch (IOException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         }
-        key.cancel();
     }
 
     public int getPort() {
@@ -92,6 +96,6 @@ public class HttpConnection extends ProtocolImpl {
             Thread.sleep(10000);
         } catch (InterruptedException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
-        }
+        }           
     }
 }

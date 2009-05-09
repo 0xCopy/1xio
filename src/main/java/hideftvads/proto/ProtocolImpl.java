@@ -1,7 +1,6 @@
 package hideftvads.proto;
 
 import java.io.*;
-import java.nio.*;
 import java.nio.channels.*;
 import java.nio.charset.*;
 import java.util.*;
@@ -22,28 +21,17 @@ public abstract class ProtocolImpl implements Protocol {
     Selector selector;
 
     ServerSocketChannel serverSocketChannel;
-    public ByteBuffer buffer;
+    //    public ByteBuffer buffer;
     private int port = 8080;
 
     public ProtocolImpl() {
-
-
         try {
 
-            try {
-                this.buffer = ByteBuffer.allocateDirect(512);
-            } catch (Exception e) {
-                this.buffer = ByteBuffer.allocateDirect(512);
-            }
-            HttpMethod.REACTOR.submit(( new Runnable() {
+            HttpMethod.REACTOR.submit((new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        
-
                         init();
-                        
-
                     } catch (IOException e) {
                         e.printStackTrace();  //TODO: Verify for a purpose
                     }
@@ -62,7 +50,7 @@ public abstract class ProtocolImpl implements Protocol {
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
         serverSocketChannel.configureBlocking(false);
-        SelectionKey selectionKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT, buffer);
+        SelectionKey selectionKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 
         while (!killswitch) {
             selector.select();
@@ -75,8 +63,6 @@ public abstract class ProtocolImpl implements Protocol {
                 if (key.isValid() && key == selectionKey) {
                     onConnect(key);
                 } else {
-                    SocketChannel client = (SocketChannel) key.channel();
-
                     if (key.isValid() && key.isReadable()) {
                         onRead(key);
                     }
@@ -87,18 +73,7 @@ public abstract class ProtocolImpl implements Protocol {
                 }
             }
         }
-    }
- 
 
-    public void onEnd(SelectionKey key, SocketChannel socketChannel) throws IOException {
-        key.cancel();
-        socketChannel.close();
-    }
-
-    public void onQuit(SelectionKey key, SocketChannel socketChannel) throws IOException {
-        key.cancel();
-        socketChannel.close();
-        killswitch = true;
     }
 
     public void onConnect(SelectionKey selectionKey) throws IOException {
@@ -107,8 +82,8 @@ public abstract class ProtocolImpl implements Protocol {
             client.configureBlocking(false);
             SelectionKey clientkey = client.register(selector, SelectionKey.OP_READ);
         }
-    } 
+    }
 
- }
+}
 
      

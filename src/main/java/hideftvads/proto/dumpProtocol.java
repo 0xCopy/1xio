@@ -11,6 +11,7 @@ import java.nio.channels.*;
  */
 public class dumpProtocol extends ProtocolImpl {
     private int port = 8182;
+    private ByteBuffer buffer = ByteBuffer.allocateDirect(512);
 
     @Override
     public void onWrite(SelectionKey key) {
@@ -24,7 +25,7 @@ public class dumpProtocol extends ProtocolImpl {
         int bytesread = socketChannel.read((ByteBuffer) getBuffer().clear());
 
         if (bytesread == -1)
-            onEnd(key, socketChannel);
+            socketChannel.close();
 
         getBuffer().flip(); //only need to do it once for trimming 
 
