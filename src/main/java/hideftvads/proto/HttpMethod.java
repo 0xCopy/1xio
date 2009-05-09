@@ -7,9 +7,7 @@ import java.io.*;
 import static java.lang.Character.*;
 import java.nio.*;
 import java.nio.channels.*;
-import static java.nio.channels.SelectionKey.*;
 import java.util.*;
-import java.util.concurrent.*;
 
 /**
  * User: jim
@@ -21,19 +19,61 @@ import java.util.concurrent.*;
 public enum HttpMethod implements Protocol {
     GET {
 
+        public void onWrite(final SelectionKey key) {
+            Object[] a = (Object[]) key.attachment();
+            Xfer xfer = (Xfer) a[1];
+            sendChunk(key, xfer);
+        }
+
+        private void sendChunk(SelectionKey key, Xfer xfer) {
+            long rem = 0;
+            SocketChannel channel = null;
+            try {
+
+                channel = (SocketChannel) key.channel();
+
+                final long progress = xfer.progress;
+                rem = xfer.getRemaining();
+
+                final long written = xfer.fc.transferTo(
+                        progress, Math.min(rem, (++xfer.chunk) << 8), channel);
+
+
+                xfer.progress += written;
+
+                final CharSequence charSequence = xfer.logEntry();
+                System.err.println(charSequence);
+                System.err.flush();
+
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+                key.cancel();
+                try {
+                    key.channel().close();
+                } catch (IOException e1) {
+                    e1.printStackTrace();   //TODO: Verify for a purpose
+                }
+            }
+            if (rem < 1) {
+                try {
+                    channel.close();
+                } catch (IOException e) {
+                    e.printStackTrace();  //TODO: Verify for a purpose
+                }
+            }
+        }
         /**
          * enrolls a new SelectionKey to the methods
          *
-         * @param key
+         * @param oldKey
          * @throws IOException
          */
         @Override
-        public void onConnect(final SelectionKey key) throws IOException, IOError {
+        public void onConnect(final SelectionKey oldKey) {
 
             try {
-                final Object o = key.attachment();
-                assert o instanceof ByteBuffer;
-                ByteBuffer buffer = (ByteBuffer) o;
+                assert oldKey.attachment() instanceof ByteBuffer;
+                final ByteBuffer buffer = (ByteBuffer) oldKey.attachment();
                 final CharSequence charSequence = methodParameters(buffer);
                 final String[] strings = charSequence.toString().split(" ");
                 final String fname = strings[0];
@@ -47,61 +87,48 @@ public enum HttpMethod implements Protocol {
 
                     RandomAccessFile f = new RandomAccessFile(fnode, "r");
 
-                    final long fileLength = f.length();
                     final FileChannel fc = f.getChannel();
-                    final SelectableChannel channel = key.channel();
-                    final Callable<Long> callable = new Callable<Long>() {
-                        public long progres;
 
-                        public boolean done;
+                    final SocketChannel channel = (SocketChannel) oldKey.channel();
 
-                        @Override
-                        public Long call() throws Exception {
-                            try {
-                                final long remaining = fileLength - progres;
-                                if (remaining == 0) {
-                                    done = true;
-                                    fc.close();
-                                    channel.close();
-                                    ;
-                                }
-                                System.err.println("call: remaining: " + remaining);
+                    final Xfer xfer = new Xfer(fc, fname);
+                    oldKey.interestOps(SelectionKey.OP_WRITE);
+                    oldKey.attach(new Object[]{this, xfer});
 
-                                final long written = fc.transferTo(progres, remaining, (WritableByteChannel) channel);
-                                progres += written;
-                                System.err.println("call: wrote: " + written);
-                                if (remaining != 0) {
-                                    final SelectionKey selectionKey = channel.keyFor(selector);
-                                    if (selectionKey == null)
-                                        channel.register(selector, 0);
-                                    key.attach(REACTOR.submit((this)));
-                                    SelectionKey key = selectionKey.interestOps(OP_WRITE);
-                                    selector.wakeup();
-
-                                }
-                                return remaining;
-
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                                return -1L;
-                            }
-                        }
-                    };
-
-                    final String s = "HTTP/1.1 200 OK\n" + "Content-Length: " + fileLength + "\n\n";
-
-                    ((SocketChannel) channel).write(ByteBuffer.wrap(s.getBytes()));
-                    REACTOR.submit(callable);
 
                 }
-            } catch (Exception e) {
+            } catch (FileNotFoundException e) {
                 e.printStackTrace();  //TODO: Verify for a purpose
-            } finally {
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+            }
+        }
 
+        class Xfer {
+            long progress;
+            FileChannel fc;
+            long creation = System.currentTimeMillis();
+            long completion = -1L;
+            public CharSequence name;
+            public long chunk;
+
+            public Xfer(FileChannel fc, CharSequence name) {
+                this.fc = fc;
+                this.name = name;
             }
 
-        }
-    }, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION;
+            long getRemaining() throws IOException {
+                return fc.size() - progress;
+            }
+
+
+            public CharSequence logEntry() throws IOException {
+                return new TextBuilder().append("Xfer: ").append(name).append(' ').append(progress).append('/').append(getRemaining());
+
+            }
+        }}, //POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION
+    ;
+    private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
 
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
@@ -110,13 +137,6 @@ public enum HttpMethod implements Protocol {
     final int margin = name().length() + 1;
     private static final UTF8ByteBufferReader UTF_8_BYTE_BUFFER_READER = new UTF8ByteBufferReader();
 
-    HttpMethod() {
-        try {
-            selector = Selector.open();
-        } catch (IOException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        }
-    }
 
     /**
      * deduce a few parse optimizations
@@ -209,63 +229,11 @@ public enum HttpMethod implements Protocol {
     }
 
 
-    public Selector
-            selector;
-    ;
-
     private static final Random RANDOM = new Random();
 
-    {
-        final Runnable initThread = new Runnable() {
-            @Override
-            public void run() {
-
-                try
-
-                {
-
-                    System.err.println("initializing selector for " + name());
-                    int notice = 0;
-                    while (!ProtocolImpl.killswitch) {
-
-                        if (((notice++ % 100) == 0) && 0 == (byte) RANDOM.nextInt() % 3)
-                            System.err.println("selecting: " + name());
-                        final int num = selector.select(250);
-
-                        if (num > 0) {
-                            final Set<SelectionKey> selectionKeySet = selector.selectedKeys();
-
-
-                            final Iterator<SelectionKey> keyIterator = selectionKeySet.iterator();
-                            while (keyIterator.hasNext()) {
-                                SelectionKey selectionKey = keyIterator.next();
-                                if (
-                                        selectionKey.isValid() && selectionKey.isReadable()) {
-                                    onRead(selectionKey);
-                                }
-
-                                if (
-                                        selectionKey.isValid() && selectionKey.isWritable()) {
-                                    onWrite(selectionKey);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (IOException e) {
-                    e.printStackTrace();  //TODO: Verify for a purpose
-                }
-                finally {
-
-                }
-            }
-        };
-
-        getReactor().submit(initThread);
-    }
 
     @Override
-    public void onRead(SelectionKey key) throws IOException {
+    public void onRead(SelectionKey key) {
         final Object o = key.attachment();
         if (o instanceof ByteBuffer) {
             this.tokenize((ByteBuffer) o);
@@ -284,16 +252,17 @@ public enum HttpMethod implements Protocol {
      * @throws IOException
      */
     @Override
-    public void onConnect(SelectionKey key) throws IOException, IOError {
+    public void onConnect(SelectionKey key) {
 
         try {
-            final Object o = key.attachment();
-            assert o instanceof ByteBuffer;
-            ByteBuffer buffer = (ByteBuffer) o;
+            assert key.attachment() instanceof ByteBuffer;
+            ByteBuffer buffer = (ByteBuffer) key.attachment();
 
             final CharSequence charSequence = methodParameters(buffer);
             throw new UnsupportedOperationException(name() + charSequence.toString());
 
+        } catch (IOException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
         } finally {
 
         }
@@ -303,22 +272,9 @@ public enum HttpMethod implements Protocol {
     @Override
     public void onWrite(SelectionKey key) {
 
-        Future<Long> writeme = (Future) key.attachment();
-        try {
-            final Long remaining = writeme.get();
-
-        } catch (InterruptedException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        } catch (ExecutionException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        }
-
 
     }
 
-    public ExecutorService getReactor() {
-        return Protocol.REACTOR;
-    }
 }
 
 

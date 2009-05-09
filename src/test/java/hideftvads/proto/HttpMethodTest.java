@@ -18,7 +18,7 @@ public class HttpMethodTest extends TestCase {
 
         ByteBuffer indexEntries;
 
-        request = "POST /welcome/test1.mp4 HTTP/1.1 UTF-8 en-US*\n" +
+        request = "GET /welcome/test1.mp4 HTTP/1.1 UTF-8 en-US*\n" +
                 "foo: sadfa f\n" +
                 "aaoao: asdasdasd awd sdsa dsf a\n\n";
 
@@ -27,7 +27,7 @@ public class HttpMethodTest extends TestCase {
         for (HttpMethod httpMethod : HttpMethod.values()) {
 
             if (httpMethod.recognize(indexEntries)) {
-                assertEquals(HttpMethod.POST, httpMethod);
+                assertEquals(HttpMethod.GET, httpMethod);
                 httpMethod.tokenize(indexEntries);
 
                 final int margin = httpMethod.margin;

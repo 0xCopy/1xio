@@ -1,6 +1,8 @@
 package hideftvads.proto;
 
+
 import java.io.*;
+import java.nio.*;
 import java.nio.channels.*;
 
 /**
@@ -12,10 +14,7 @@ import java.nio.channels.*;
  */
 public class HttpConnection extends ProtocolImpl {
 
-    private int
-
-
-            port = 8080;
+    private int port = 8080;
 
     /**
      * this is where we take the input channel bytes, and write them to an output channel
@@ -24,52 +23,62 @@ public class HttpConnection extends ProtocolImpl {
      */
     @Override
     public void onWrite(SelectionKey key) {
-        //ToDo: verify for a purpose
+
+        final Object[] att = (Object[]) key.attachment();
+
+        if (att != null) {
+            HttpMethod method = (HttpMethod) att[0];
+            method.onWrite(key);
+            return;
+        }
+        key.cancel();
     }
 
     /**
      * this is where we implement http 1.1. request handling
      * <p/>
-     * gatekeeper
+     * Lifecycle of the attachemnts is
+     * <ol>
+     * <li> null means new socket
+     * <li>we attach(buffer) during the onConnect
+     * <li> we <i>expect</i> Object[HttpMethod,*,...] to be present for ongoing connections to delegate
+     * </ol>
      *
      * @param key
      * @throws IOException
      */
     @Override
-    public void onRead(SelectionKey key) throws IOException {
+    public void onRead(SelectionKey key) {
 
-        
+
         try {
-            final SocketChannel socketChannel = (SocketChannel) key.channel();
-
-            final int i = socketChannel.read(buffer);
-            buffer.flip();
-            key.attach(buffer);
-
-            /**
-             * select has signaled a IO event
-             *
-             */
-            for (HttpMethod method : HttpMethod.values()) {
+            Object[] p = (Object[]) key.attachment();
+            if (p != null) {
+                HttpMethod fst = (HttpMethod) p[0];
+                fst.onRead(key);
+                return;
+            } else {
+                final SocketChannel channel;
+                channel = (SocketChannel) key.channel();
+                final int i = channel.read(buffer);
+                buffer.flip().mark();
 
 
                 for (HttpMethod httpMethod : HttpMethod.values()) {
-                    if (httpMethod.recognize((buffer))) {
-                        
-                        key.cancel();
+                    if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
+                        System.err.println("found: " + httpMethod);
+                        key.attach(buffer);
                         httpMethod.onConnect(key);
-
                         return;
                     }
                 }
             }
+        } catch (IOException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
         }
-        catch (Exception e2) {
-        } finally {
-            
-        }
+        key.cancel();
     }
-  
+
     public int getPort() {
         return port;  //ToDo: verify for a purpose
     }
@@ -79,6 +88,10 @@ public class HttpConnection extends ProtocolImpl {
             (String... a) {
 
         final HttpConnection connection = new HttpConnection();
-
+        while (!killswitch) try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
     }
 }

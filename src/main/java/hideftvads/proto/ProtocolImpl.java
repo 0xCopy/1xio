@@ -1,7 +1,5 @@
 package hideftvads.proto;
 
-import javolution.context.*;
-
 import java.io.*;
 import java.nio.*;
 import java.nio.channels.*;
@@ -67,7 +65,7 @@ public abstract class ProtocolImpl implements Protocol {
         SelectionKey selectionKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT, buffer);
 
         while (!killswitch) {
-            selector.select(10000);
+            selector.select();
             Set keys = selector.selectedKeys();
 
             for (Iterator i = keys.iterator(); i.hasNext();) {
@@ -90,10 +88,7 @@ public abstract class ProtocolImpl implements Protocol {
             }
         }
     }
-
-    abstract public void onWrite(SelectionKey key);
-
-    abstract public void onRead(SelectionKey key) throws IOException;
+ 
 
     public void onEnd(SelectionKey key, SocketChannel socketChannel) throws IOException {
         key.cancel();
@@ -111,10 +106,8 @@ public abstract class ProtocolImpl implements Protocol {
             SocketChannel client = serverSocketChannel.accept();
             client.configureBlocking(false);
             SelectionKey clientkey = client.register(selector, SelectionKey.OP_READ);
-            clientkey.attach(new Integer(0));
         }
-    }
-
+    } 
 
  }
 

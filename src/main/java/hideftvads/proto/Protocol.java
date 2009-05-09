@@ -12,7 +12,7 @@ import java.util.concurrent.*;
 public interface Protocol {
     int BUFFERSIZE = 512;
 
-    ExecutorService REACTOR = Executors.newCachedThreadPool();
+    ExecutorService REACTOR = Executors.newFixedThreadPool(32);
 
     void onWrite(SelectionKey key);
 
