@@ -1,1 +1,1 @@
-java -cp classes -Xmx1g  -XX:+CMSClassUnloadingEnabled  -XX:+AggressiveOpts -XX:+CMSPermGenSweepingEnabled   -Xbootclasspath/a:../lib/boot.jar -ea  -XX:MaxPermSize=280m hideftvads.proto.HttpConnection
+java -cp classes -Xmx1g  -XX:+CMSClassUnloadingEnabled  -XX:+AggressiveOpts -XX:+CMSPermGenSweepingEnabled   -XX:MaxPermSize=280m hideftvads.proto.HttpConnection
