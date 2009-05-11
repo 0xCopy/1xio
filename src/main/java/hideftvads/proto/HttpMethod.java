@@ -64,7 +64,7 @@ public enum HttpMethod {
 
                     response(key, $200);
 
-                    final CharBuffer c= (CharBuffer) ByteBuffer.allocateDirect(512).asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
+                    final CharBuffer c = (CharBuffer) ByteBuffer.allocateDirect(512).asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
 
                     channel.write(UTF8.encode(c));
                     key.interestOps(SelectionKey.OP_WRITE);
@@ -236,13 +236,7 @@ public enum HttpMethod {
             }
         }
 
-        public int getPort() {
-            return port;  //ToDo: verify for a purpose
-        }
-
-
-        {
-        }},;
+    },;
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 //    public void init(){}
 
@@ -421,9 +415,8 @@ public enum HttpMethod {
 
 
         ((SocketChannel) key.channel()).write(out);
-        
-        
-        
+
+
     }
 
     void onWrite(SelectionKey key) {
@@ -471,99 +464,74 @@ public enum HttpMethod {
         }));
     }
 
-    static
-    private void init() throws Exception {
-        selector = Selector.open();
-        serverSocketChannel = ServerSocketChannel.open();
-        serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
-        serverSocketChannel.configureBlocking(false);
-        final SelectionKey listenerKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-
-        while (!killswitch) {
-            selector.select();
-            Set keys = selector.selectedKeys();
-
-            for (Iterator i = keys.iterator(); i.hasNext();) {
-                final SelectionKey key = (SelectionKey) i.next();
-                i.remove();
-
-                if (key.isValid()) {
-                    try {
-                        Callable<SelectionKey> callable = new Callable<SelectionKey>() {
-                            public SelectionKey call() throws Exception {
-                                final Object o = key.attachment();
-
-                                final HttpMethod m[] = new HttpMethod[]{$};
-
-
-                                if (o instanceof Object[]) {
-                                    m[0] = (HttpMethod) ((Object[]) o)[0];
-                                }
-                                if (o instanceof HttpMethod) {
-                                    m[0] = (HttpMethod) o;
-                                }
-
-                                if (key.isWritable()) {
-                                    //                        REACTOR.submit((Runnable) new Runnable() {
-                                    //                            public void run() {
-                                    m[0].onWrite(key);
-                                    return key;
-                                    //                            }
-                                    //                        });
-                                }
-
-                                if (key.isReadable()) {
-                                    //                        REACTOR.submit((Runnable) new Runnable() {
-                                    //                            public void run() {
-                                    m[0].onRead(key);
-                                    return key;
-                                    //                            }
-                                    //                        });
-
-                                }
-
-                                if (key.isConnectable()) {
-                                    //                        REACTOR.submit((Runnable) new Runnable() {
-                                    //                            public void run() {
-                                    m[0].onConnect(key);
-                                    return key;
-                                    //                            }
-                                    //                        });
-                                }
-
-                                if (key.isAcceptable()) {
-                                    //                        REACTOR.submit((Runnable) new Runnable() {
-                                    //                            public void run() {
-                                    m[0].onAccept(key);
-                                    return key;
-                                    //                            }
-                                    //                        });
-                                }
-
-                                return null;
-                            }
-
-                        };
-
-//                        REACTOR.submit(callable);
-                        callable.call();
-                    } catch (Exception e) {
-                        e.printStackTrace();  //TODO: Verify for a purpose
-                    } finally {
-                    }
-
-                } else {
-                    key.channel().close();
-                }
-
-
-            }
-        }
-        listenerKey.cancel();
-    }
-
     void onAccept(SelectionKey key) {
-        throw new UnsupportedOperationException(
-        );
+        throw new UnsupportedOperationException();
     }
+
+    static private void init() {
+        try {
+            selector = Selector.open();
+            serverSocketChannel = ServerSocketChannel.open();
+            serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
+            serverSocketChannel.configureBlocking(false);
+            final SelectionKey listenerKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+            while (!killswitch) {
+                selector.select();
+                Set keys = selector.selectedKeys();
+    
+                for (Iterator i = keys.iterator(); i.hasNext();) {
+                    final SelectionKey key = (SelectionKey) i.next();
+                    i.remove();
+    
+                    if (key.isValid()) {
+                        try {
+                            final Object o = key.attachment();
+    
+                            new Callable() {
+    
+                                public Object call() throws Exception {
+                                    delegate(o);
+                                    return null;
+                                }
+    
+                                void delegate(Object... att) {
+                                    final Object o = att[0];
+    
+                                    final HttpMethod m = (o instanceof HttpMethod) ? (HttpMethod) o : $;
+    
+                                    if (key.isWritable()) {
+                                        m.onWrite(key);
+                                    }
+    
+                                    if (key.isReadable()) {
+                                        m.onRead(key);
+                                    }
+    
+                                    if (key.isConnectable()) {
+                                        m.onConnect(key);
+                                    }
+    
+                                    if (key.isAcceptable()) {
+                                        m.onAccept(key);
+                                    }
+                                }
+                            }.call();
+    
+                        } catch (Exception e) {
+                            key.attach(null);
+                            key.channel().close();
+    
+                        } finally {
+    
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        } finally {
+            
+        }
+    } 
 };
