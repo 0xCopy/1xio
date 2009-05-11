@@ -11,11 +11,10 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /**
+ * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
  * User: jim
  * Date: May 6, 2009
  * Time: 10:12:22 PM
- * <p/>
- * see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
  */
 public enum HttpMethod {
     GET {
@@ -46,17 +45,14 @@ public enum HttpMethod {
 
                 final String[] strings = parameters.toString().split(" ");
                 final String fname = strings[0];
-                final File fnode = new File("./" + fname);
-                //      System.err.println("attempting to open file://" + fnode.getAbsolutePath());
 
-                if (!fnode.canRead() || !fnode.isFile()) {
 
-                    key.channel().close();
-                } else {
+                final RandomAccessFile fnode = new RandomAccessFile("./" + fname, "r");
 
-                    RandomAccessFile f = new RandomAccessFile(fnode, "r");
 
-                    final FileChannel fc = f.getChannel();
+                if (fnode.getFD().valid()) {
+
+                    final FileChannel fc = fnode.getChannel();
 
                     final SocketChannel channel = (SocketChannel) key.channel();
 
@@ -71,16 +67,20 @@ public enum HttpMethod {
                     key.attach(new Object[]{this, xfer});
                     return;
                 }
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
-            } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
+            } catch (Exception e) {
+            } finally {
             }
+            
             try {
-                key.channel().close();
-            } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
-            }
+                    response(key, $404);
+//                ((SocketChannel) key.channel()).write();
+                    key.cancel();
+                    key.channel().close();
+                    return;
+                } catch (IOException e) {
+                    e.printStackTrace();  //TODO: Verify for a purpose
+                }
+
         }
 
         class Xfer {
@@ -97,7 +97,7 @@ public enum HttpMethod {
                     try {
                         channel = (SocketChannel) key.channel();
 
-                        progress += this.fc.transferTo(progress, Math.min(getRemaining(), (chunk++) << 8), channel);
+                        progress += this.fc.transferTo(progress, Math.min(getRemaining(), (++chunk) << 8), channel);
                         if (getRemaining() < 1) throw new XferCompletionException();
 
                     } catch (Exception e) {
@@ -224,6 +224,9 @@ public enum HttpMethod {
                             return;
                         }
 
+                    response(key, HttpStatus.$400);
+                    channel.write(buffer);
+
                     channel.close();
                     return;
                 }
@@ -232,7 +235,7 @@ public enum HttpMethod {
                 fst.onRead(key);
 
             } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
+                e.printStackTrace();
             }
         }
 
@@ -331,34 +334,6 @@ public enum HttpMethod {
 
         return decoder.decode((ByteBuffer) indexEntries.flip().position(margin));
 
-
-//        TextBuilder builder = TextBuilder.newInstance();
-//        final UTF8ByteBufferReader utf8ByteBufferReader = new UTF8ByteBufferReader().setInput(charBuffer);
-//        if (utf8ByteBufferReader._byteBuffer == null)
-//            throw new IOException("Reader closed");
-//        while (utf8ByteBufferReader._byteBuffer.hasRemaining()) {
-//            byte b1 = utf8ByteBufferReader._byteBuffer.get();
-//            if (b >= 0) {
-//                ((Appendable) builder).append((char) b); // Most common case.
-//            } else {
-//                int code = utf8ByteBufferReader.read2(b);
-//                if (code < 0x10000) {
-//                    ((Appendable) builder).append((char) code);
-//                } else if (code <= 0x10ffff) { // Surrogates.
-//                    ((Appendable) builder).append((char) (((code - 0x10000) >> 10) + 0xd800));
-//                    ((Appendable) builder).append((char) (((code - 0x10000) & 0x3ff) + 0xdc00));
-//                } else {
-//                    throw new CharConversionException("Cannot convert U+"
-//                            + Integer.toHexString(code)
-//                            + " to char (code greater than U+10FFFF)");
-//                }
-//            }
-//        }
-//
-//        return charBuffer.asCharBuffer();
-//        
-//        
-//        return builder;
     }
 
 
@@ -479,59 +454,53 @@ public enum HttpMethod {
             while (!killswitch) {
                 selector.select();
                 Set keys = selector.selectedKeys();
-    
+
                 for (Iterator i = keys.iterator(); i.hasNext();) {
                     final SelectionKey key = (SelectionKey) i.next();
                     i.remove();
-    
+
                     if (key.isValid()) {
                         try {
-                            final Object o = key.attachment();
-    
-                            new Callable() {
-    
-                                public Object call() throws Exception {
-                                    delegate(o);
-                                    return null;
-                                }
-    
-                                void delegate(Object... att) {
-                                    final Object o = att[0];
-    
-                                    final HttpMethod m = (o instanceof HttpMethod) ? (HttpMethod) o : $;
-    
-                                    if (key.isWritable()) {
-                                        m.onWrite(key);
-                                    }
-    
-                                    if (key.isReadable()) {
-                                        m.onRead(key);
-                                    }
-    
-                                    if (key.isConnectable()) {
-                                        m.onConnect(key);
-                                    }
-    
-                                    if (key.isAcceptable()) {
-                                        m.onAccept(key);
-                                    }
-                                }
-                            }.call();
-    
+
+                            final Object at = key.attachment();
+                            final HttpMethod m;
+                            m = at == null
+                                    ? $
+                                    : (HttpMethod) (((
+                                    at instanceof Object[])
+                                    && ((Object[]) at)[0] instanceof HttpMethod)
+                                    ? ((Object[]) at)[0]
+                                    : at instanceof HttpMethod
+                                    ? at
+                                    : $
+                            );
+
+                            if (key.isWritable()) {
+                                m.onWrite(key);
+                            }
+
+                            if (key.isReadable()) {
+                                m.onRead(key);
+                            }
+
+                            if (key.isConnectable()) {
+                                m.onConnect(key);
+                            }
+
+                            if (key.isAcceptable()) {
+                                m.onAccept(key);
+                            }
+
+
                         } catch (Exception e) {
                             key.attach(null);
                             key.channel().close();
-    
-                        } finally {
-    
                         }
                     }
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        } finally {
-            
+        } catch (Throwable e) {
+            e.printStackTrace();
         }
-    } 
+    }
 };
