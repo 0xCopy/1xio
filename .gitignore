@@ -1,5 +1,5 @@
-.*.iml
-.*.ipr
-.*.iws
-.*.dmg
+1xio.iml
+1xio.ipr
+1xio.iws
+*.dmg
 target/*
