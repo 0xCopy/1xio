@@ -90,7 +90,7 @@ enum HttpStatus {
     $507("Insufficient Storage");
 
 
-    private final String caption;
+    final String caption;
 
     HttpStatus(String caption) {
 

@@ -1,13 +1,14 @@
 package hideftvads.proto;
 
-import javolution.io.*;
-import javolution.text.*;
+import static hideftvads.proto.HttpStatus.*;
 
 import java.io.*;
 import static java.lang.Character.*;
 import java.nio.*;
 import java.nio.channels.*;
+import java.nio.charset.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * User: jim
@@ -16,13 +17,16 @@ import java.util.*;
  * <p/>
  * see http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
  */
-public enum HttpMethod implements Protocol {
+public enum HttpMethod {
     GET {
 
         public void onWrite(final SelectionKey key) {
             Object[] a = (Object[]) key.attachment();
             Xfer xfer = (Xfer) a[1];
-            xfer.sendChunk(key, xfer);
+            xfer.sendChunk(key);
+        }
+        public void onConnect(final SelectionKey key) {
+            onAccept(key);
         }
 
         /**
@@ -32,13 +36,15 @@ public enum HttpMethod implements Protocol {
          * @throws IOException
          */
         @Override
-        public void onConnect(final SelectionKey key) {
+        public void onAccept(final SelectionKey key) {
 
             try {
                 assert key.attachment() instanceof ByteBuffer;
                 final ByteBuffer buffer = (ByteBuffer) key.attachment();
-                final CharSequence charSequence = methodParameters(buffer);
-                final String[] strings = charSequence.toString().split(" ");
+                final CharSequence parameters = methodParameters(buffer);
+
+
+                final String[] strings = parameters.toString().split(" ");
                 final String fname = strings[0];
                 final File fnode = new File("./" + fname);
                 //      System.err.println("attempting to open file://" + fnode.getAbsolutePath());
@@ -55,13 +61,12 @@ public enum HttpMethod implements Protocol {
                     final SocketChannel channel = (SocketChannel) key.channel();
 
                     final Xfer xfer = new Xfer(fc, fname);
-                    String s = "HTTP/1.1 200 OK\n" +
-//                            "Content-Type: application/binary\n" +
-                            "Connection: close\n" +
-                            "Content-Length: " + fc.size() + "\n\n";
 
-                    channel.write(ByteBuffer.wrap(s.getBytes()));
+                    response(key, $200);
 
+                    final CharBuffer c= (CharBuffer) ByteBuffer.allocateDirect(512).asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
+
+                    channel.write(UTF8.encode(c));
                     key.interestOps(SelectionKey.OP_WRITE);
                     key.attach(new Object[]{this, xfer});
                     return;
@@ -79,50 +84,6 @@ public enum HttpMethod implements Protocol {
         }
 
         class Xfer {
-            private void sendChunk(SelectionKey key, Xfer xfer) {
-                long rem = 0;
-                SocketChannel channel = null;
-                try {
-
-                    channel = (SocketChannel) key.channel();
-
-                    final long progress = xfer.progress;
-                    rem = xfer.getRemaining();
-
-                    final long written = xfer.fc.transferTo(
-                            progress, Math.min(rem, (++xfer.chunk) << 8)
-                            , channel);
-
-
-                    xfer.progress += written;
-
-//                final CharSequence charSequence = xfer.logEntry();
-//                System.err.println(charSequence);
-//                System.err.flush();
-
-                } catch (IOException e) {
-                    e.printStackTrace();  //TODO: Verify for a purpose
-                    key.cancel();
-                    try {
-                        key.channel().close();
-                    } catch (IOException e1) {
-                        e1.printStackTrace();   //TODO: Verify for a purpose
-                    }
-                }
-                if (rem < 1) {
-                    try {
-                        fc.close();
-                    } catch (IOException e) {
-        //     e.printStackTrace();  //TODO: Verify for a purpose
-                    }
-                    try {
-                        channel.close();
-                    } catch (IOException e) {
-        //     e.printStackTrace();  //TODO: Verify for a purpose
-                    }
-                }
-            }
-
             long progress;
             FileChannel fc;
             long creation = System.currentTimeMillis();
@@ -130,29 +91,167 @@ public enum HttpMethod implements Protocol {
             public CharSequence name;
             public long chunk;
 
+            private void sendChunk(SelectionKey key) {
+                SocketChannel channel = null;
+                if (fc.isOpen() && key.isValid() && key.channel().isOpen())
+                    try {
+                        channel = (SocketChannel) key.channel();
+
+                        progress += this.fc.transferTo(progress, Math.min(getRemaining(), (chunk++) << 8), channel);
+                        if (getRemaining() < 1) throw new XferCompletionException();
+
+                    } catch (Exception e) {
+                        key.cancel();
+                        try {
+                            fc.close();
+                        } catch (IOException e1) {
+                            e1.printStackTrace();  //TODO: Verify for a purpose
+                        }
+                        fc = null;
+                        try {
+                            channel.close();
+
+                        } catch (IOException e1) {
+                            e1.printStackTrace();  //TODO: Verify for a purpose
+                        }
+                    }
+            }
+
+
             public Xfer(FileChannel fc, CharSequence name) {
                 this.fc = fc;
                 this.name = name;
             }
 
-            long getRemaining() throws IOException {
-                return fc.size() - progress;
+            long getRemaining() {
+                try {
+                    return fc.size() - progress;
+                } catch (Exception e) {
+                    return 0;
+                }
             }
 
 
             public CharSequence logEntry() throws IOException {
-                return new TextBuilder().append("Xfer: ").append(name).append(' ').append(progress).append('/').append(getRemaining());
+                return new StringBuilder().append("Xfer: ").append(name).append(' ').append(progress).append('/').append(getRemaining());
 
             }
-        }}, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION;
-    private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
 
+
+            class XferCompletionException extends Exception {
+            }
+        }},
+
+    POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION,
+    $ {
+
+        public void onAccept(SelectionKey selectionKey) {
+            if (selectionKey.isAcceptable()) {
+                SocketChannel client = null;
+                SelectionKey clientkey = null;
+
+                try {
+                    client = serverSocketChannel.accept();
+                    client.configureBlocking(false).register(selector, SelectionKey.OP_READ);
+                } catch (IOException e) {
+
+                    e.printStackTrace();  //TODO: Verify for a purpose
+
+                    try {
+                        if (client != null) {
+                            client.close();
+//                            InterruptibleChannel clientkey;
+                        }
+                    } catch (IOException e1) {
+                        e1.printStackTrace();  //TODO: Verify for a purpose
+                    }
+                }
+            }
+        }
+
+        /**
+         * this is where we take the input channel bytes, and write them to an output channel
+         *
+         * @param key
+         */
+        @Override
+        public void onWrite(SelectionKey key) {
+
+            final Object[] att = (Object[]) key.attachment();
+
+            if (att != null) {
+                HttpMethod method = (HttpMethod) att[0];
+                method.onWrite(key);
+                return;
+            }
+            key.cancel();
+        }
+
+        /**
+         * this is where we implement http 1.1. request handling
+         * <p/>
+         * Lifecycle of the attachemnts is
+         * <ol>
+         * <li> null means new socket
+         * <li>we attach(buffer) during the onConnect
+         * <li> we <i>expect</i> Object[HttpMethod,*,...] to be present for ongoing connections to delegate
+         * </ol>
+         *
+         * @param key
+         * @throws IOException
+         */
+        @Override
+        public void onRead(SelectionKey key) {
+
+
+            try {
+                Object[] p = (Object[]) key.attachment();
+                if (p == null) {
+                    final SocketChannel channel;
+                    channel = (SocketChannel) key.channel();
+
+                    final ByteBuffer buffer = ByteBuffer.allocateDirect(512);
+                    final int i = channel.read(buffer);
+
+                    buffer.flip().mark();
+
+
+                    for (HttpMethod httpMethod : HttpMethod.values())
+                        if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
+                            //System.err.println("found: " + httpMethod);
+                            key.attach(buffer);
+                            httpMethod.onConnect(key);
+                            return;
+                        }
+
+                    channel.close();
+                    return;
+                }
+
+                HttpMethod fst = (HttpMethod) p[0];
+                fst.onRead(key);
+
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+            }
+        }
+
+        public int getPort() {
+            return port;  //ToDo: verify for a purpose
+        }
+
+
+        {
+        }},;
+    private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
+//    public void init(){}
 
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
 
 
     final int margin = name().length() + 1;
-    private static final UTF8ByteBufferReader UTF_8_BYTE_BUFFER_READER = new UTF8ByteBufferReader();
+    static final ExecutorService REACTOR = Executors.newCachedThreadPool();
+    private static final Charset UTF8 = Charset.forName("UTF8");
 
 
     /**
@@ -236,13 +335,36 @@ public enum HttpMethod implements Protocol {
                 && ('\r' != b)
                 && ('\t' != b)) ;
 
-        final ByteBuffer charBuffer = ((ByteBuffer) indexEntries.duplicate().flip().position(margin)).slice();
+        return decoder.decode((ByteBuffer) indexEntries.flip().position(margin));
 
-        TextBuilder builder = TextBuilder.newInstance();
-        final UTF8ByteBufferReader utf8ByteBufferReader = new UTF8ByteBufferReader().setInput(charBuffer);
-        utf8ByteBufferReader.read(builder);
 
-        return builder;
+//        TextBuilder builder = TextBuilder.newInstance();
+//        final UTF8ByteBufferReader utf8ByteBufferReader = new UTF8ByteBufferReader().setInput(charBuffer);
+//        if (utf8ByteBufferReader._byteBuffer == null)
+//            throw new IOException("Reader closed");
+//        while (utf8ByteBufferReader._byteBuffer.hasRemaining()) {
+//            byte b1 = utf8ByteBufferReader._byteBuffer.get();
+//            if (b >= 0) {
+//                ((Appendable) builder).append((char) b); // Most common case.
+//            } else {
+//                int code = utf8ByteBufferReader.read2(b);
+//                if (code < 0x10000) {
+//                    ((Appendable) builder).append((char) code);
+//                } else if (code <= 0x10ffff) { // Surrogates.
+//                    ((Appendable) builder).append((char) (((code - 0x10000) >> 10) + 0xd800));
+//                    ((Appendable) builder).append((char) (((code - 0x10000) & 0x3ff) + 0xdc00));
+//                } else {
+//                    throw new CharConversionException("Cannot convert U+"
+//                            + Integer.toHexString(code)
+//                            + " to char (code greater than U+10FFFF)");
+//                }
+//            }
+//        }
+//
+//        return charBuffer.asCharBuffer();
+//        
+//        
+//        return builder;
     }
 
 
@@ -263,31 +385,185 @@ public enum HttpMethod implements Protocol {
      * @param key
      * @throws IOException
      */
-    @Override
     public void onConnect(SelectionKey key) {
 
         try {
-            assert key.attachment() instanceof ByteBuffer;
-            ByteBuffer buffer = (ByteBuffer) key.attachment();
+            response(key, $501);
+            ByteBuffer b = (ByteBuffer) key.attachment();
 
-            final CharSequence charSequence = methodParameters(buffer);
-            throw new UnsupportedOperationException(name() + charSequence.toString());
+            final SelectableChannel channel = key.channel();
+            SocketChannel c = (SocketChannel) channel;
+
+            c.write((ByteBuffer) b.rewind());
+
 
         } catch (IOException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         } finally {
+            try {
+                key.channel().close();
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+            }
+            key.cancel();
 
         }
 
-    }
-
-    @Override
-    public void onWrite(SelectionKey key) {
-
 
     }
 
-}
+    private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
+        final CharBuffer charBuffer = (CharBuffer) ByteBuffer.allocateDirect(512).asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append('\n').flip();
 
+        final ByteBuffer out = UTF8.encode(charBuffer);
+
+
+        ((SocketChannel) key.channel()).write(out);
+        
+        
+        
+    }
+
+    void onWrite(SelectionKey key) {
+        throw new UnsupportedOperationException();
+    }
+
+    ;
+
+    public static void main
+            (String... a) throws IOException {
+
+//        final HttpConnection connection = new HttpConnection();
+
+
+        while (!killswitch) try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
+    }
+
+    final static Charset charset = UTF8;
+    final static CharsetEncoder charsetEncoder = charset.newEncoder();
+    final static CharsetDecoder decoder = charset.newDecoder();
+    static boolean killswitch = false;
+
+
+    static Selector selector;
+
+    static ServerSocketChannel serverSocketChannel;
+    //    public ByteBuffer buffer;
+    private static int port = 8080;
+
+    static {
+
+        REACTOR.submit((new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    init();
+                } catch (Exception e) {
+                    e.printStackTrace();  //TODO: Verify for a purpose
+                }
+            }
+        }));
+    }
+
+    static
+    private void init() throws Exception {
+        selector = Selector.open();
+        serverSocketChannel = ServerSocketChannel.open();
+        serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
+        serverSocketChannel.configureBlocking(false);
+        final SelectionKey listenerKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        while (!killswitch) {
+            selector.select();
+            Set keys = selector.selectedKeys();
+
+            for (Iterator i = keys.iterator(); i.hasNext();) {
+                final SelectionKey key = (SelectionKey) i.next();
+                i.remove();
+
+                if (key.isValid()) {
+                    try {
+                        Callable<SelectionKey> callable = new Callable<SelectionKey>() {
+                            public SelectionKey call() throws Exception {
+                                final Object o = key.attachment();
+
+                                final HttpMethod m[] = new HttpMethod[]{$};
+
+
+                                if (o instanceof Object[]) {
+                                    m[0] = (HttpMethod) ((Object[]) o)[0];
+                                }
+                                if (o instanceof HttpMethod) {
+                                    m[0] = (HttpMethod) o;
+                                }
+
+                                if (key.isWritable()) {
+                                    //                        REACTOR.submit((Runnable) new Runnable() {
+                                    //                            public void run() {
+                                    m[0].onWrite(key);
+                                    return key;
+                                    //                            }
+                                    //                        });
+                                }
+
+                                if (key.isReadable()) {
+                                    //                        REACTOR.submit((Runnable) new Runnable() {
+                                    //                            public void run() {
+                                    m[0].onRead(key);
+                                    return key;
+                                    //                            }
+                                    //                        });
+
+                                }
+
+                                if (key.isConnectable()) {
+                                    //                        REACTOR.submit((Runnable) new Runnable() {
+                                    //                            public void run() {
+                                    m[0].onConnect(key);
+                                    return key;
+                                    //                            }
+                                    //                        });
+                                }
+
+                                if (key.isAcceptable()) {
+                                    //                        REACTOR.submit((Runnable) new Runnable() {
+                                    //                            public void run() {
+                                    m[0].onAccept(key);
+                                    return key;
+                                    //                            }
+                                    //                        });
+                                }
+
+                                return null;
+                            }
+
+                        };
+
+//                        REACTOR.submit(callable);
+                        callable.call();
+                    } catch (Exception e) {
+                        e.printStackTrace();  //TODO: Verify for a purpose
+                    } finally {
+                    }
+
+                } else {
+                    key.channel().close();
+                }
+
+
+            }
+        }
+        listenerKey.cancel();
+    }
+
+    void onAccept(SelectionKey key) {
+        throw new UnsupportedOperationException(
+        );
+    }
+};
