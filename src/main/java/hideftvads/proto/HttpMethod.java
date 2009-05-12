@@ -4,6 +4,7 @@ import static hideftvads.proto.HttpStatus.*;
 
 import java.io.*;
 import static java.lang.Character.*;
+import java.lang.ref.*;
 import java.nio.*;
 import java.nio.channels.*;
 import java.nio.charset.*;
@@ -60,26 +61,32 @@ public enum HttpMethod {
 
                     response(key, $200);
 
-                    final CharBuffer c = (CharBuffer) ByteBuffer.allocateDirect(512).asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
+                    final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(2);
+                    try {
+                        final ByteBuffer buffer1 = byteBufferReference.get();
+                        final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
 
-                    channel.write(UTF8.encode(c));
-                    key.interestOps(SelectionKey.OP_WRITE);
-                    key.attach(new Object[]{this, xfer});
+                        channel.write(UTF8.encode(c));
+                        key.interestOps(SelectionKey.OP_WRITE);
+                        key.attach(new Object[]{this, xfer});
+                    } finally {
+                        recycle(byteBufferReference, DEFAULT_EXP);
+                    }
                     return;
                 }
             } catch (Exception e) {
             } finally {
             }
-            
+
             try {
-                    response(key, $404);
+                response(key, $404);
 //                ((SocketChannel) key.channel()).write();
-                    key.cancel();
-                    key.channel().close();
-                    return;
-                } catch (IOException e) {
-                    e.printStackTrace();  //TODO: Verify for a purpose
-                }
+                key.cancel();
+                key.channel().close();
+                return;
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+            }
 
         }
 
@@ -98,22 +105,32 @@ public enum HttpMethod {
                         channel = (SocketChannel) key.channel();
 
                         progress += this.fc.transferTo(progress, Math.min(getRemaining(), (++chunk) << 8), channel);
-                        if (getRemaining() < 1) throw new XferCompletionException();
+                        if (getRemaining() < 1) {
+                            throw COMPLETION_EXCEPTION;
+                        }
 
                     } catch (Exception e) {
                         key.cancel();
                         try {
                             fc.close();
                         } catch (IOException e1) {
-                            e1.printStackTrace();  //TODO: Verify for a purpose
+                            e1.printStackTrace();
                         }
                         fc = null;
                         try {
-                            channel.close();
+                            if (channel != null) {
+                                channel.close();
+                            }
 
                         } catch (IOException e1) {
-                            e1.printStackTrace();  //TODO: Verify for a purpose
+                            e1.printStackTrace();
                         }
+                    } catch (CompletionException e) {
+                        //
+                        completion = System.currentTimeMillis();
+                        key.attach($);
+                        key.interestOps(SelectionKey.OP_READ);
+                        return;
                     }
             }
 
@@ -204,29 +221,37 @@ public enum HttpMethod {
         public void onRead(SelectionKey key) {
 
 
+            Reference<ByteBuffer> byteBufferReference = null;
             try {
                 Object[] p = (Object[]) key.attachment();
+
                 if (p == null) {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    final ByteBuffer buffer = ByteBuffer.allocateDirect(512);
-                    final int i = channel.read(buffer);
+                    byteBufferReference = HttpMethod.borrowBuffer(2);
+                    try {
+                        final ByteBuffer buffer =
 
-                    buffer.flip().mark();
+                                byteBufferReference.get();
+                        final int i = channel.read(buffer);
 
+                        buffer.flip().mark();
 
-                    for (HttpMethod httpMethod : HttpMethod.values())
-                        if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
-                            //System.err.println("found: " + httpMethod);
-                            key.attach(buffer);
-                            httpMethod.onConnect(key);
-                            return;
-                        }
+                        for (HttpMethod httpMethod : HttpMethod.values())
+                            if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
+                                //System.out.println("found: " + httpMethod);
+                                key.attach(buffer);
+                                httpMethod.onConnect(key);
+                                return;
+                            }
 
-                    response(key, HttpStatus.$400);
-                    channel.write(buffer);
-
+                        response(key, HttpStatus.$400);
+                        channel.write(buffer);
+                    }
+                    finally {
+                        recycle(byteBufferReference, DEFAULT_EXP);
+                    }
                     channel.close();
                     return;
                 }
@@ -235,19 +260,20 @@ public enum HttpMethod {
                 fst.onRead(key);
 
             } catch (IOException e) {
+
                 e.printStackTrace();
             }
         }
 
     },;
-    private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
-//    public void init(){}
+    private static final CompletionException COMPLETION_EXCEPTION = new CompletionException();
+    private static final int DEFAULT_EXP = 2;
+
 
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
 
 
     final int margin = name().length() + 1;
-    static final ExecutorService REACTOR = Executors.newCachedThreadPool();
     private static final Charset UTF8 = Charset.forName("UTF8");
 
 
@@ -294,7 +320,7 @@ public enum HttpMethod {
             if ((!isBlank) && wasBlank) {
                 out.put((byte) ((byte) (in.position() & 0xff) - 1));
 
-                System.err.println("token found: " + in.duplicate().position(prevIdx));
+                System.out.println("token found: " + in.duplicate().position(prevIdx));
             }
         }
 
@@ -384,33 +410,23 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final CharBuffer charBuffer = (CharBuffer) ByteBuffer.allocateDirect(512).asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append('\n').flip();
+        final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(2);
+        try {
+            final ByteBuffer buffer = byteBufferReference.get();
+            final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append('\n').flip();
 
-        final ByteBuffer out = UTF8.encode(charBuffer);
+            final ByteBuffer out = UTF8.encode(charBuffer);
 
 
-        ((SocketChannel) key.channel()).write(out);
-
+            ((SocketChannel) key.channel()).write(out);
+        } finally {
+            recycle(byteBufferReference, DEFAULT_EXP);
+        }
 
     }
 
     void onWrite(SelectionKey key) {
         throw new UnsupportedOperationException();
-    }
-
-    ;
-
-    public static void main
-            (String... a) throws IOException {
-
-//        final HttpConnection connection = new HttpConnection();
-
-
-        while (!killswitch) try {
-            Thread.sleep(10000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        }
     }
 
     final static Charset charset = UTF8;
@@ -425,15 +441,30 @@ public enum HttpMethod {
     //    public ByteBuffer buffer;
     private static int port = 8080;
 
-    static {
+    private static ExecutorService threadPool;
+    public static final int CHUNKDEFAULT = 4;
+    public static final int CHUNK_NUM = 128;
+    public static final int KBYTE = 1024;
+    private static final int MAX_EXP = 16;
 
-        REACTOR.submit((new Runnable() {
+
+    static {
+        try {
+            selector = Selector.open();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        threadPool = Executors.newCachedThreadPool();
+
+        HttpMethod.threadPool.submit((new Runnable() {
             @Override
             public void run() {
                 try {
                     init();
                 } catch (Exception e) {
-                    e.printStackTrace();  //TODO: Verify for a purpose
+                    e.printStackTrace();
                 }
             }
         }));
@@ -441,6 +472,72 @@ public enum HttpMethod {
 
     void onAccept(SelectionKey key) {
         throw new UnsupportedOperationException();
+    }
+
+
+    static Reference<ByteBuffer> borrowBuffer(int... exp) {
+
+        final int slot = (exp.length == 0)
+                ? DEFAULT_EXP
+                : exp[0];
+
+        if (exp.length > 1)
+            System.out.println("heap " + slot + " count " + counter[slot]);
+
+
+        final Queue<Reference<ByteBuffer>> buffer = buffers[slot];
+        Reference<ByteBuffer> o;
+
+
+        if (buffer.isEmpty()) {
+            refill(slot);
+            o = borrowBuffer(slot, counter[slot]++);
+        } else {
+            o = buffer.remove();
+        }
+        minus();
+        return o;
+    }
+
+    private static void minus() {
+        System.out.write('-');
+    }
+
+
+    static synchronized private void refill(final int slot) {
+        Queue<Reference<ByteBuffer>> queue = buffers[slot];
+        if (queue == null) {
+            queue = buffers[slot] = new ConcurrentLinkedQueue<Reference<ByteBuffer>>();
+        }
+
+        if (queue.isEmpty()) {
+
+            final int czize = KBYTE << slot;
+            final ByteBuffer buffer = ByteBuffer.allocateDirect(czize * CHUNK_NUM);
+
+            for (int i = 0; i < CHUNK_NUM; i++) {
+                final int i2 = buffer.position();
+                final int newPosition = i2 + czize;
+
+                buffer.limit(newPosition);
+
+                queue.add(new SoftReference<ByteBuffer>(buffer.slice()));
+                plus();
+                buffer.position(newPosition);
+            }
+            System.out.flush();
+        }
+
+    }
+
+    final
+    private static Queue<Reference<ByteBuffer>>[] buffers = (Queue<Reference<ByteBuffer>>[]) new Queue<?>[MAX_EXP];
+
+    static {
+        for (int i = 0; i < buffers.length; i++)
+            buffers[i] = new ConcurrentLinkedQueue<Reference<ByteBuffer>>();
+
+
     }
 
     static private void init() {
@@ -453,10 +550,10 @@ public enum HttpMethod {
 
             while (!killswitch) {
                 selector.select();
-                Set keys = selector.selectedKeys();
+                Set<SelectionKey> keys = selector.selectedKeys();
 
-                for (Iterator i = keys.iterator(); i.hasNext();) {
-                    final SelectionKey key = (SelectionKey) i.next();
+                for (Iterator<SelectionKey> i = keys.iterator(); i.hasNext();) {
+                    final SelectionKey key = i.next();
                     i.remove();
 
                     if (key.isValid()) {
@@ -503,4 +600,38 @@ public enum HttpMethod {
             e.printStackTrace();
         }
     }
+
+//    static int counter[]=new int[MAX_EXP];
+
+    static void recycle(Reference<ByteBuffer> byteBufferReference, int shift) {
+        final ByteBuffer buffer = byteBufferReference.get();
+        if (buffer != null) {
+            buffer.clear();
+            buffers[shift].add(byteBufferReference);
+            plus();
+        }
+    }
+
+    private static void plus() {
+        System.out.write('+');
+    }
+
+    static final class CompletionException extends Throwable {
+    }
+
+    private static int[] counter = new int[MAX_EXP];
+
+    public static void main
+            (String... a) throws IOException {
+
+//        final HttpConnection connection = new HttpConnection();
+
+
+        while (!killswitch) try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
+    }
+
 };
