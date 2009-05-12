@@ -54,18 +54,13 @@ public enum HttpMethod {
                 if (fnode.getFD().valid()) {
 
                     final FileChannel fc = fnode.getChannel();
-
                     final SocketChannel channel = (SocketChannel) key.channel();
-
                     final Xfer xfer = new Xfer(fc, fname);
-
                     response(key, $200);
-
                     final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(2);
                     try {
                         final ByteBuffer buffer1 = byteBufferReference.get();
                         final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
-
                         channel.write(UTF8.encode(c));
                         key.interestOps(SelectionKey.OP_WRITE);
                         key.attach(new Object[]{this, xfer});
@@ -75,19 +70,13 @@ public enum HttpMethod {
                     return;
                 }
             } catch (Exception e) {
-            } finally {
             }
-
             try {
                 response(key, $404);
-//                ((SocketChannel) key.channel()).write();
                 key.cancel();
-                key.channel().close();
-                return;
             } catch (IOException e) {
                 e.printStackTrace();  //TODO: Verify for a purpose
             }
-
         }
 
         class Xfer {
@@ -97,6 +86,7 @@ public enum HttpMethod {
             long completion = -1L;
             public CharSequence name;
             public long chunk;
+            private boolean pipeline = false;
 
             private void sendChunk(SelectionKey key) {
                 SocketChannel channel = null;
@@ -114,7 +104,7 @@ public enum HttpMethod {
                         try {
                             fc.close();
                         } catch (IOException e1) {
-                            e1.printStackTrace();
+//                            e1.printStackTrace();
                         }
                         fc = null;
                         try {
@@ -123,13 +113,26 @@ public enum HttpMethod {
                             }
 
                         } catch (IOException e1) {
-                            e1.printStackTrace();
+//                            e1.printStackTrace();
                         }
                     } catch (CompletionException e) {
                         //
-                        completion = System.currentTimeMillis();
-                        key.attach($);
-                        key.interestOps(SelectionKey.OP_READ);
+                        try {
+                            fc.close();
+                        } catch (IOException e1) {
+//                            e1.printStackTrace();  //TODO: Verify for a purpose
+                        }
+//                        completion = System.currentTimeMillis();
+//                        try {
+//                            double l =(  fc.size() / ((this.completion - this.creation))/1000.0);
+//                            System.out.println(   "x:"+  l ); 
+//                        } catch (IOException e1) {
+//                         }
+                        if (pipeline) {
+                            key.attach($);
+                            key.interestOps(SelectionKey.OP_READ);
+                        } else
+                            key.cancel();
                         return;
                     }
             }
@@ -150,13 +153,10 @@ public enum HttpMethod {
 
 
             public CharSequence logEntry() throws IOException {
-                return new StringBuilder().append("Xfer: ").append(name).append(' ').append(progress).append('/').append(getRemaining());
-
+                return new StringBuilder().append(getClass().getName()).append(':' ).append(name).append(' ').append(progress).append('/').append(getRemaining());
             }
 
-
-            class XferCompletionException extends Exception {
-            }
+ 
         }},
 
     POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION,
@@ -500,7 +500,7 @@ public enum HttpMethod {
     }
 
     private static void minus() {
-        System.out.write('-');
+        //System.out.write('-');
     }
 
 
@@ -525,7 +525,7 @@ public enum HttpMethod {
                 plus();
                 buffer.position(newPosition);
             }
-            System.out.flush();
+            //  System.out.flush();
         }
 
     }
@@ -613,7 +613,7 @@ public enum HttpMethod {
     }
 
     private static void plus() {
-        System.out.write('+');
+//        System.out.write('+');
     }
 
     static final class CompletionException extends Throwable {
