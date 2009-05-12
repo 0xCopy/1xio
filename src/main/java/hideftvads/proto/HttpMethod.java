@@ -275,7 +275,7 @@ public enum HttpMethod {
 
 
     final int margin = name().length() + 1;
-    private static final Charset UTF8 = Charset.forName("UTF8");
+    static final Charset UTF8 = Charset.forName("UTF8");
 
 
     /**
@@ -411,7 +411,7 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final Reference<ByteBuffer> byteBufferReference = HttpMethod .borrowBuffer(DEFAULT_EXP);
+        final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
         try {
             final ByteBuffer buffer = byteBufferReference.get();
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append('\n').flip();
@@ -420,7 +420,7 @@ public enum HttpMethod {
 
 
             ((SocketChannel) key.channel()).write(out);
-        }catch (Exception e){
+        } catch (Exception e) {
         } finally {
             recycle(byteBufferReference, DEFAULT_EXP);
         }
@@ -440,7 +440,7 @@ public enum HttpMethod {
     static Selector selector;
 
     static ServerSocketChannel serverSocketChannel;
-    //    public ByteBuffer buffer;
+    //    public ByteBuffer token;
     private static int port = 8080;
 
     private static ExecutorService threadPool;
@@ -498,7 +498,7 @@ public enum HttpMethod {
             o = buffer.remove();
         }
         minus();
-        return o;
+        return o.get() == null ? borrowBuffer(exp) : o;
     }
 
     private static void minus() {
