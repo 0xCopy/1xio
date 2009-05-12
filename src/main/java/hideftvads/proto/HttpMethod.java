@@ -57,13 +57,14 @@ public enum HttpMethod {
                     final SocketChannel channel = (SocketChannel) key.channel();
                     final Xfer xfer = new Xfer(fc, fname);
                     response(key, $200);
-                    final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(2);
+                    final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
                     try {
                         final ByteBuffer buffer1 = byteBufferReference.get();
                         final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
                         channel.write(UTF8.encode(c));
                         key.interestOps(SelectionKey.OP_WRITE);
                         key.attach(new Object[]{this, xfer});
+                    } catch (Exception e) {
                     } finally {
                         recycle(byteBufferReference, DEFAULT_EXP);
                     }
@@ -153,10 +154,10 @@ public enum HttpMethod {
 
 
             public CharSequence logEntry() throws IOException {
-                return new StringBuilder().append(getClass().getName()).append(':' ).append(name).append(' ').append(progress).append('/').append(getRemaining());
+                return new StringBuilder().append(getClass().getName()).append(':').append(name).append(' ').append(progress).append('/').append(getRemaining());
             }
 
- 
+
         }},
 
     POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION,
@@ -229,7 +230,7 @@ public enum HttpMethod {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    byteBufferReference = HttpMethod.borrowBuffer(2);
+                    byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
                     try {
                         final ByteBuffer buffer =
 
@@ -238,7 +239,7 @@ public enum HttpMethod {
 
                         buffer.flip().mark();
 
-                        for (HttpMethod httpMethod : HttpMethod.values())
+                        for (final HttpMethod httpMethod : HttpMethod.values())
                             if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
                                 //System.out.println("found: " + httpMethod);
                                 key.attach(buffer);
@@ -248,8 +249,8 @@ public enum HttpMethod {
 
                         response(key, HttpStatus.$400);
                         channel.write(buffer);
-                    }
-                    finally {
+                    } catch (Exception e) {
+                    } finally {
                         recycle(byteBufferReference, DEFAULT_EXP);
                     }
                     channel.close();
@@ -267,7 +268,7 @@ public enum HttpMethod {
 
     },;
     private static final CompletionException COMPLETION_EXCEPTION = new CompletionException();
-    private static final int DEFAULT_EXP = 2;
+    private static final int DEFAULT_EXP = 0;
 
 
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
@@ -410,7 +411,7 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(2);
+        final Reference<ByteBuffer> byteBufferReference = HttpMethod .borrowBuffer(DEFAULT_EXP);
         try {
             final ByteBuffer buffer = byteBufferReference.get();
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append('\n').flip();
@@ -419,6 +420,7 @@ public enum HttpMethod {
 
 
             ((SocketChannel) key.channel()).write(out);
+        }catch (Exception e){
         } finally {
             recycle(byteBufferReference, DEFAULT_EXP);
         }
