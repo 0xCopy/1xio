@@ -76,7 +76,7 @@ public enum HttpMethod {
                 response(key, $404);
                 key.cancel();
             } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
+                e.printStackTrace();
             }
         }
 
@@ -112,23 +112,13 @@ public enum HttpMethod {
                             if (channel != null) {
                                 channel.close();
                             }
-
                         } catch (IOException e1) {
-//                            e1.printStackTrace();
                         }
                     } catch (CompletionException e) {
-                        //
                         try {
                             fc.close();
                         } catch (IOException e1) {
-//                            e1.printStackTrace();  //TODO: Verify for a purpose
                         }
-//                        completion = System.currentTimeMillis();
-//                        try {
-//                            double l =(  fc.size() / ((this.completion - this.creation))/1000.0);
-//                            System.out.println(   "x:"+  l ); 
-//                        } catch (IOException e1) {
-//                         }
                         if (pipeline) {
                             key.attach($);
                             key.interestOps(SelectionKey.OP_READ);
@@ -173,16 +163,13 @@ public enum HttpMethod {
                     client.configureBlocking(false).register(selector, SelectionKey.OP_READ);
                 } catch (IOException e) {
 
-                    e.printStackTrace();  //TODO: Verify for a purpose
-
+                    e.printStackTrace();  
                     try {
                         if (client != null) {
                             client.close();
-//                            InterruptibleChannel clientkey;
-                        }
+                         }
                     } catch (IOException e1) {
-                        e1.printStackTrace();  //TODO: Verify for a purpose
-                    }
+                     }
                 }
             }
         }
@@ -394,13 +381,11 @@ public enum HttpMethod {
 
 
         } catch (IOException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        } finally {
+         } finally {
             try {
                 key.channel().close();
             } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
-            }
+             }
             key.cancel();
 
         }
@@ -626,8 +611,7 @@ public enum HttpMethod {
     public static void main
             (String... a) throws IOException {
 
-//        final HttpConnection connection = new HttpConnection();
-
+ 
 
         while (!killswitch) try {
             Thread.sleep(10000);
