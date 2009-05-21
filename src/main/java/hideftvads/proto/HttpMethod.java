@@ -18,7 +18,7 @@ import java.util.concurrent.*;
  * Time: 10:12:22 PM
  */
 public enum HttpMethod {
-    GET {
+    GET { 
 
         public void onWrite(final SelectionKey key) {
             Object[] a = (Object[]) key.attachment();
@@ -60,7 +60,14 @@ public enum HttpMethod {
                     final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
                     try {
                         final ByteBuffer buffer1 = byteBufferReference.get();
-                        final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\nContent-Length: " + fc.size()).append("\n\n").flip();
+                        MimeType mimeType = null;
+                        try {
+                            mimeType = MimeType.valueOf(fname.substring(fname.lastIndexOf('.') + 1));
+                        } catch (Exception ignored) {
+                            throw new IOError(ignored);
+                        }
+                        String x =(   mimeType == null ? "\n" : ("Content-Type: " + mimeType.contentType + "\n"));
+                        final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n" + x + "Content-Length: " + fc.size()).append("\n\n").flip();
                         channel.write(UTF8.encode(c));
                         key.interestOps(SelectionKey.OP_WRITE);
                         key.attach(new Object[]{this, xfer});
@@ -163,13 +170,13 @@ public enum HttpMethod {
                     client.configureBlocking(false).register(selector, SelectionKey.OP_READ);
                 } catch (IOException e) {
 
-                    e.printStackTrace();  
+                    e.printStackTrace();
                     try {
                         if (client != null) {
                             client.close();
-                         }
+                        }
                     } catch (IOException e1) {
-                     }
+                    }
                 }
             }
         }
@@ -381,11 +388,11 @@ public enum HttpMethod {
 
 
         } catch (IOException e) {
-         } finally {
+        } finally {
             try {
                 key.channel().close();
             } catch (IOException e) {
-             }
+            }
             key.cancel();
 
         }
@@ -611,13 +618,11 @@ public enum HttpMethod {
     public static void main
             (String... a) throws IOException {
 
- 
 
         while (!killswitch) try {
             Thread.sleep(10000);
         } catch (InterruptedException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
-        }
+         }
     }
 
 };
