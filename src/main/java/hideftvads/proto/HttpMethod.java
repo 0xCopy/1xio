@@ -1,15 +1,29 @@
 package hideftvads.proto;
 
 import static hideftvads.proto.HttpStatus.*;
+import javolution.context.Context;
+import javolution.context.LogContext;
 
-import java.io.*;
-import static java.lang.Character.*;
-import java.lang.ref.*;
-import java.nio.*;
+import java.io.IOError;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import static java.lang.Character.isWhitespace;
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.*;
-import java.nio.charset.*;
-import java.util.*;
-import java.util.concurrent.*;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.util.Iterator;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -18,8 +32,7 @@ import java.util.concurrent.*;
  * Time: 10:12:22 PM
  */
 public enum HttpMethod {
-    GET { 
-
+    GET {
         public void onWrite(final SelectionKey key) {
             Object[] a = (Object[]) key.attachment();
             Xfer xfer = (Xfer) a[1];
@@ -64,9 +77,9 @@ public enum HttpMethod {
                         try {
                             mimeType = MimeType.valueOf(fname.substring(fname.lastIndexOf('.') + 1));
                         } catch (Exception ignored) {
-                            throw new IOError(ignored);
+//                            throw new IOError(ignored);
                         }
-                        String x =(   mimeType == null ? "\n" : ("Content-Type: " + mimeType.contentType + "\n"));
+                        String x = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
                         final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n" + x + "Content-Length: " + fc.size()).append("\n\n").flip();
                         channel.write(UTF8.encode(c));
                         key.interestOps(SelectionKey.OP_WRITE);
@@ -90,55 +103,77 @@ public enum HttpMethod {
         class Xfer {
             long progress;
             FileChannel fc;
-            long creation = System.currentTimeMillis();
-            long completion = -1L;
+            long creation = System.currentTimeMillis(),
+                    completion = -1;
             public CharSequence name;
             public long chunk;
             private boolean pipeline = false;
 
-            private void sendChunk(SelectionKey key) {
-                SocketChannel channel = null;
-                if (fc.isOpen() && key.isValid() && key.channel().isOpen())
-                    try {
-                        channel = (SocketChannel) key.channel();
-
-                        progress += this.fc.transferTo(progress, Math.min(getRemaining(), (++chunk) << 8), channel);
-                        if (getRemaining() < 1) {
-                            throw COMPLETION_EXCEPTION;
-                        }
-
-                    } catch (Exception e) {
-                        key.cancel();
+             void sendChunk(final SelectionKey key) {
+                if (!fc.isOpen() || !key.isValid() || !key.channel().isOpen()) {
+                    return;
+                }
+                final SocketChannel[] channel = new SocketChannel[]{null};
+                Callable<Object> callable = new Callable<Object>() {
+                    public Object call() throws Exception {
+//                        Context.enter(LogContext.class);
                         try {
-                            fc.close();
-                        } catch (IOException e1) {
-//                            e1.printStackTrace();
-                        }
-                        fc = null;
-                        try {
-                            if (channel != null) {
-                                channel.close();
+                            try {
+//                                 key.channel();
+
+                                progress += fc.transferTo(progress, Math.min(getRemaining(), ++chunk << 8), (WritableByteChannel) key.channel());
+                                if (getRemaining() < 1) {
+
+                                    completion = System.currentTimeMillis();
+                                    final double span = (double) completion - creation / 1000.0;
+                                    final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName()+ '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + (fc.size() / span) + ' ' + "chunkavg " + (fc.size() / chunk);
+                                    System.err.println(s);
+                                    try {
+                                        fc.close();
+                                    } catch (IOException ignored) {
+                                    }
+                                    if (pipeline) {
+                                        key.attach($);
+                                        key.interestOps(SelectionKey.OP_READ);
+                                    } else {
+                                        key.cancel();
+                                    }
+                                }
+
+                            } catch (Exception e) {
+                                System.err.println(name() + ":fail:" + e.getCause() + ' ' + creation + ' ' + name + " progress:" + progress);
+
+                                key.cancel();
+                                try {
+                                    fc.close();
+                                } catch (IOException ignored) {
+                                }
+                                fc = null;
+                                try {
+                                    if (channel[0] != null) {
+                                        channel[0].close();
+                                    }
+                                } catch (IOException ignored) {
+                                }
                             }
-                        } catch (IOException e1) {
+                        } finally {
+//                            Context.exit(LogContext.class);
                         }
-                    } catch (CompletionException e) {
-                        try {
-                            fc.close();
-                        } catch (IOException e1) {
-                        }
-                        if (pipeline) {
-                            key.attach($);
-                            key.interestOps(SelectionKey.OP_READ);
-                        } else
-                            key.cancel();
-                        return;
+                        return null;
                     }
-            }
+                };
+                 try {
+                     callable.call();
+                 } catch (Exception ignored) {
+
+                 }
+             }
 
 
             public Xfer(FileChannel fc, CharSequence name) {
                 this.fc = fc;
                 this.name = name;
+                completion = -1L;
             }
 
             long getRemaining() {
@@ -261,7 +296,6 @@ public enum HttpMethod {
         }
 
     },;
-    private static final CompletionException COMPLETION_EXCEPTION = new CompletionException();
     private static final int DEFAULT_EXP = 0;
 
 
@@ -452,7 +486,7 @@ public enum HttpMethod {
 
         threadPool = Executors.newCachedThreadPool();
 
-        HttpMethod.threadPool.submit((new Runnable() {
+        HttpMethod.threadPool.submit(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -461,7 +495,7 @@ public enum HttpMethod {
                     e.printStackTrace();
                 }
             }
-        }));
+        });
     }
 
     void onAccept(SelectionKey key) {
@@ -610,8 +644,6 @@ public enum HttpMethod {
 //        System.out.write('+');
     }
 
-    static final class CompletionException extends Throwable {
-    }
 
     private static int[] counter = new int[MAX_EXP];
 
@@ -622,7 +654,7 @@ public enum HttpMethod {
         while (!killswitch) try {
             Thread.sleep(10000);
         } catch (InterruptedException e) {
-         }
+        }
     }
 
 };
