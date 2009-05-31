@@ -1,8 +1,6 @@
 package alg;
 
-import com.thoughtworks.xstream.XStream;
 
-//import static scene.SceneLayoutApp.XSTREAM;
 
 /**
  * User: jim

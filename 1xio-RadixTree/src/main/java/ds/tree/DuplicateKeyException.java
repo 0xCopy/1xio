@@ -24,6 +24,8 @@ THE SOFTWARE.
 
 package ds.tree;
 
+import javolution.text.Text;
+
 /**
  * excepion thrown if a duplicate key is inserted in a {@link RadixTree}
  * 
@@ -34,8 +36,8 @@ public class DuplicateKeyException extends RuntimeException
 {
 	private static final long serialVersionUID = 3141795907493885706L;
 
-	public DuplicateKeyException(String msg)
+	public DuplicateKeyException(Text msg)
 	{
-		super(msg);
+		super(msg.toString());
 	}
 }

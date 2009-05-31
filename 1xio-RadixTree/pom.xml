@@ -1,67 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <artifactId>1xio-parent</artifactId>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>1xio-parent</artifactId>
+        <groupId>hideftvads</groupId>
+        <version>0.0.5</version>
+    </parent>
+    <version>0.0.5</version>
     <groupId>hideftvads</groupId>
-    <version>1.0-SNAPSHOT</version>
-  </parent>
-  <groupId>hideftvads</groupId>
-  <artifactId>1xio-RadixTree</artifactId>
-  <version>19</version>
-  <name>1xio-RadixTree</name>
-  <description>RadixTree of 1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for  RadixTree,server... </description>
-  <url>http://code.google.com/p/1xio/RadixTree</url>
-  <scm>
-    <tag>HEAD</tag>
-  </scm>
-  <!-- dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-</project>
--->
-  <repositories>
-    <repository>
-      <id>1xio-legacy</id>
-      <name>1xio-Repo</name>
-      <url> file://${basedir}/../src/main/repository </url>
-      <layout>default</layout>
-    </repository>
-  </repositories>
-  <dependencies>
-    <dependency>
-      <artifactId> junit </artifactId>
-      <groupId> deprecated </groupId>
-      <version> 4.4 </version>
-    </dependency>
-  </dependencies>
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>1.5</source>
-          <target>1.5</target>
-          <fork>true</fork>
-          <meminitial>1024m</meminitial>
-          <maxmem>1024m</maxmem>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
-  <reporting>
-    <plugins>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>javacc-maven-plugin</artifactId>
-        <version>2.4.1</version>
-      </plugin>
-    </plugins>
-  </reporting>
+    <artifactId>1xio-RadixTree</artifactId>
+    <description>RadixTree of 1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for
+        RadixTree,server...
+    </description>
+    <url>http://code.google.com/p/1xio/RadixTree</url>
+    <scm>
+        <tag>HEAD</tag>
+    </scm>
+    <repositories>
+        <repository>
+            <id>1xio-legacy</id>
+            <name>1xio-Repo</name>
+            <url>file://${basedir}/../src/main/repository</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
+    <dependencies>
+        <dependency>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+          <version>3.8.1</version>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>javolution</groupId>
+            <artifactId>javolution</artifactId>
+            <version>5.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.thoughtworks.xstream</groupId>
+            <artifactId>xstream</artifactId>
+            <version>1.3.1</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                    <fork>true</fork>
+                    <meminitial>1024m</meminitial>
+                    <maxmem>1024m</maxmem>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>javacc-maven-plugin</artifactId>
+                <version>2.4.1</version>
+            </plugin>
+        </plugins>
+    </reporting>
 </project>

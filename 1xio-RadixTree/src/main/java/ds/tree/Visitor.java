@@ -26,6 +26,8 @@ THE SOFTWARE.
 
 package ds.tree;
 
+import javolution.text.Text;
+
 /**
  * The visitor interface that is used by {@link RadixTreeImpl} for perfroming
  * task on a searched node.
@@ -36,14 +38,14 @@ package ds.tree;
  */
 public interface Visitor<T> {
     /**
-     * This method gets called by {@link RadixTreeImpl#visit(String, Visitor) visit} 
+     * This method gets called by {@link RadixTreeImpl#visit(Text, Visitor) visit}
      * when it finds a node matching the key given to it.
      * 
      * @param key The key that matched the node
      * @param parent The parent of the node being visited
      * @param node The node that is being visited
      */
-    public void visit(String key, RadixTreeNode<T> parent, RadixTreeNode<T> node);
+    public void visit(Text key, RadixTreeNode<T> parent, RadixTreeNode<T> node);
 
     /**
      * The visitor can store any type of result object, depending on the context of 

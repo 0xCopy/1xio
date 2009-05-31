@@ -1,14 +1,19 @@
 package hideftvads.server;
 
+
 import alg.Pair;
+import ds.tree.RadixTree;
+import ds.tree.RadixTreeImpl;
 import hideftvads.proto.HttpMethod;
 import static hideftvads.proto.HttpMethod.$;
+import javolution.util.FastMap;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -26,17 +31,22 @@ public class Agent {
     String config;
     Properties
             properties = new Properties();
+    private static Map configs = new FastMap();
+
 
     public static void main(String[] args) throws IOException {
-
 
         for (String arg : args) {
 
             if (arg.startsWith("-")) {
-                final Pair pair = new Pair(arg.split("=", 2));
-                pair.$1();
+                final Pair<String, String> pair = new Pair<String, String>(arg.split("=", 2));
+
+                configs.put(pair.$1(pair.$1().substring(1)), pair.$2());
 
             }
+
+
+            final RadixTree tree = new RadixTreeImpl();
 
 
         }

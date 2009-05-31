@@ -24,6 +24,8 @@ THE SOFTWARE.
 
 package ds.tree;
 
+import javolution.text.Text;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,7 +37,7 @@ import java.util.List;
  * @param <T>
  */
 class RadixTreeNode<T> {
-    private String key;
+    private Text key;
 
     private List<RadixTreeNode<T>> childern;
 
@@ -48,7 +50,7 @@ class RadixTreeNode<T> {
      * all over the places
      */
     public RadixTreeNode() {
-        key = "";
+        key = Text.EMPTY;
         childern = new ArrayList<RadixTreeNode<T>>();
         real = false;
     }
@@ -61,11 +63,11 @@ class RadixTreeNode<T> {
         this.value = data;
     }
 
-    public String getKey() {
+    public Text getKey() {
         return key;
     }
 
-    public void setKey(String value) {
+    public void setKey(Text value) {
         this.key = value;
     }
 
@@ -86,7 +88,7 @@ class RadixTreeNode<T> {
     }
     
 
-	public int getNumberOfMatchingCharacters(String key) {
+	public int getNumberOfMatchingCharacters(Text key) {
 		int numberOfMatchingCharacters = 0;
         while (numberOfMatchingCharacters < key.length() && numberOfMatchingCharacters < this.getKey().length()) {
             if (key.charAt(numberOfMatchingCharacters) != this.getKey().charAt(numberOfMatchingCharacters)) {
@@ -97,9 +99,7 @@ class RadixTreeNode<T> {
 		return numberOfMatchingCharacters;
 	}
 
-    
-    @Override
-    public String toString() {
+    public Text toText() {
 		return key;
     	
     }

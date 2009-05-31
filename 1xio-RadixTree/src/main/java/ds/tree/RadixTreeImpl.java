@@ -26,19 +26,19 @@ THE SOFTWARE.
 
 package ds.tree;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Queue;
+import javolution.text.Text;
+
+import java.util.*;
+
 
 /**
  * Implementation for Radix tree {@link RadixTree}
- * 
+ *
  * @author Tahseen Ur Rehman (tahseen.ur.rehman {at.spam.me.not} gmail.com)
- * @author Javid Jamae 
+ * @author Javid Jamae
  */
 public class RadixTreeImpl<T> implements RadixTree<T> {
-    
+
     protected RadixTreeNode<T> root;
 
     protected long size;
@@ -48,17 +48,18 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
      */
     public RadixTreeImpl() {
         root = new RadixTreeNode<T>();
-        root.setKey("");
+        root.setKey(Text.EMPTY);
         size = 0;
     }
-    
+
     @SuppressWarnings("unchecked")
-    public T find(String key) {
+    public T find(Text key) {
         Visitor<T> visitor = new Visitor<T>() {
+
             T result = null;
 
-            public void visit(String key, RadixTreeNode<T> parent,
-                    RadixTreeNode<T> node) {
+            public void visit(Text key, RadixTreeNode<T> parent,
+                              RadixTreeNode<T> node) {
                 if (node.isReal())
                     result = node.getValue();
             }
@@ -73,12 +74,12 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         return (T) visitor.getResult();
     }
 
-    public boolean delete(String key) {
+    public boolean delete(Text key) {
         Visitor<T> visitor = new Visitor<T>() {
             boolean delete = false;
 
-            public void visit(String key, RadixTreeNode<T> parent,
-                    RadixTreeNode<T> node) {
+            public void visit(Text key, RadixTreeNode<T> parent,
+                              RadixTreeNode<T> node) {
                 delete = node.isReal();
 
                 // if it is a real node
@@ -86,9 +87,12 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
                     // If there no children of the node we need to
                     // delete it from the its parent children list
                     if (node.getChildern().size() == 0) {
-                        Iterator<RadixTreeNode<T>> it = parent.getChildern()
-                                .iterator();
+                        final List<RadixTreeNode<T>> childern = parent.getChildern();
+                        final Iterator<RadixTreeNode<T>> radixTreeNodeIterator = childern.iterator();
+                        Iterator<RadixTreeNode<T>> it = radixTreeNodeIterator;
+
                         while (it.hasNext()) {
+
                             if (it.next().getKey().equals(node.getKey())) {
                                 it.remove();
                                 break;
@@ -114,15 +118,15 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
             /**
              * Merge a child into its parent node. Opertaion only valid if it is
              * only child of the parent node and parent node is not a real node.
-             * 
+             *
              * @param parent
              *            The parent Node
              * @param child
              *            The child Node
              */
-            private void mergeNodes(RadixTreeNode<T> parent,
-                    RadixTreeNode<T> child) {
-                parent.setKey(parent.getKey() + child.getKey());
+            void mergeNodes(RadixTreeNode<T> parent,
+                            RadixTreeNode<T> child) {
+                parent.setKey(parent.getKey().plus(child.getKey()));
                 parent.setReal(child.isReal());
                 parent.setValue(child.getValue());
                 parent.setChildern(child.getChildern());
@@ -135,36 +139,36 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
 
         visit(key, visitor);
 
-        if(((Boolean) visitor.getResult()).booleanValue()) {
-            size--;   
+        if (((Boolean) visitor.getResult()).booleanValue()) {
+            size--;
         }
-        
+
         return ((Boolean) visitor.getResult()).booleanValue();
     }
 
     /*
      * (non-Javadoc)
-     * @see ds.tree.RadixTree#insert(java.lang.String, java.lang.Object)
+     * @see ds.tree.RadixTree#insert(java.lang.Text, java.lang.Object)
      */
-    public void insert(String key, T value) throws DuplicateKeyException {
+    public void insert(Text key, T value) throws DuplicateKeyException {
         try {
-			insert(key, root, value);
-		} catch (DuplicateKeyException e) {
-			// re-throw the exception with 'key' in the message
-			throw new DuplicateKeyException("Duplicate key: '" + key + "'");
-		}
+            insert(key, root, value);
+        } catch (DuplicateKeyException e) {
+            // re-throw the exception with 'key' in the message
+            throw new DuplicateKeyException(Text.intern("Duplicate key: '").plus(key).plus("'"));
+        }
         size++;
     }
 
     /**
      * Recursively insert the key in the radix tree.
-     * 
-     * @param key The key to be inserted
-     * @param node The current node
-     * @param value The value associated with the key 
+     *
+     * @param key   The key to be inserted
+     * @param node  The current node
+     * @param value The value associated with the key
      * @throws DuplicateKeyException If the key already exists in the database.
      */
-    private void insert(String key, RadixTreeNode<T> node, T value)
+    public void insert(Text key, RadixTreeNode<T> node, T value)
             throws DuplicateKeyException {
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(key);
@@ -173,7 +177,7 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         // or we need to go down the tree
         if (node.getKey().equals("") == true || numberOfMatchingCharacters == 0 || (numberOfMatchingCharacters < key.length() && numberOfMatchingCharacters >= node.getKey().length())) {
             boolean flag = false;
-            String newText = key.substring(numberOfMatchingCharacters, key.length());
+            Text newText = key.subtext(numberOfMatchingCharacters, key.length());
             for (RadixTreeNode<T> child : node.getChildern()) {
                 if (child.getKey().startsWith(newText.charAt(0) + "")) {
                     flag = true;
@@ -195,7 +199,7 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         // there is a exact match just make the current node as data node
         else if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters == node.getKey().length()) {
             if (node.isReal() == true) {
-                throw new DuplicateKeyException("Duplicate key");
+                throw new DuplicateKeyException(Text.intern("Duplicate key"));
             }
 
             node.setReal(true);
@@ -205,32 +209,32 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         // is a prefix of the current node key
         else if (numberOfMatchingCharacters > 0 && numberOfMatchingCharacters < node.getKey().length()) {
             RadixTreeNode<T> n1 = new RadixTreeNode<T>();
-            n1.setKey(node.getKey().substring(numberOfMatchingCharacters, node.getKey().length()));
+            n1.setKey(node.getKey().subtext(numberOfMatchingCharacters, node.getKey().length()));
             n1.setReal(node.isReal());
             n1.setValue(node.getValue());
             n1.setChildern(node.getChildern());
 
-            node.setKey(key.substring(0, numberOfMatchingCharacters));
+            node.setKey(key.subtext(0, numberOfMatchingCharacters));
             node.setReal(false);
             node.setChildern(new ArrayList<RadixTreeNode<T>>());
             node.getChildern().add(n1);
-            
-            if(numberOfMatchingCharacters < key.length()) {
-	            RadixTreeNode<T> n2 = new RadixTreeNode<T>();
-	            n2.setKey(key.substring(numberOfMatchingCharacters, key.length()));
-	            n2.setReal(true);
-	            n2.setValue(value);
-	            
-	            node.getChildern().add(n2);
+
+            if (numberOfMatchingCharacters < key.length()) {
+                RadixTreeNode<T> n2 = new RadixTreeNode<T>();
+                n2.setKey(key.subtext(numberOfMatchingCharacters, key.length()));
+                n2.setReal(true);
+                n2.setValue(value);
+
+                node.getChildern().add(n2);
             } else {
-            	node.setValue(value);
+                node.setValue(value);
                 node.setReal(true);
             }
-        }        
+        }
         // this key need to be added as the child of the current node
         else {
             RadixTreeNode<T> n = new RadixTreeNode<T>();
-            n.setKey(node.getKey().substring(numberOfMatchingCharacters, node.getKey().length()));
+            n.setKey(node.getKey().subtext(numberOfMatchingCharacters, node.getKey().length()));
             n.setChildern(node.getChildern());
             n.setReal(node.isReal());
             n.setValue(node.getValue());
@@ -242,8 +246,8 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
             node.getChildern().add(n);
         }
     }
-    
-    public ArrayList<T> searchPrefix(String key, int recordLimit) {
+
+    public ArrayList<T> searchPrefix(Text key, int recordLimit) {
         ArrayList<T> keys = new ArrayList<T>();
 
         RadixTreeNode<T> node = searchPefix(key, root);
@@ -258,7 +262,7 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         return keys;
     }
 
-    private void getNodes(RadixTreeNode<T> parent, ArrayList<T> keys, int limit) {
+    void getNodes(RadixTreeNode<T> parent, ArrayList<T> keys, int limit) {
         Queue<RadixTreeNode<T>> queue = new LinkedList<RadixTreeNode<T>>();
 
         queue.addAll(parent.getChildern());
@@ -277,16 +281,16 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         }
     }
 
-    private RadixTreeNode<T> searchPefix(String key, RadixTreeNode<T> node) {
+    RadixTreeNode<T> searchPefix(Text key, RadixTreeNode<T> node) {
         RadixTreeNode<T> result = null;
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(key);
-        
+
         if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters <= node.getKey().length()) {
             result = node;
         } else if (node.getKey().equals("") == true
                 || (numberOfMatchingCharacters < key.length() && numberOfMatchingCharacters >= node.getKey().length())) {
-            String newText = key.substring(numberOfMatchingCharacters, key.length());
+            Text newText = key.subtext(numberOfMatchingCharacters, key.length());
             for (RadixTreeNode<T> child : node.getChildern()) {
                 if (child.getKey().startsWith(newText.charAt(0) + "")) {
                     result = searchPefix(newText, child);
@@ -298,12 +302,12 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
         return result;
     }
 
-    public boolean contains(String key) {
+    public boolean contains(Text key) {
         Visitor<T> visitor = new Visitor<T>() {
             boolean result = false;
 
-            public void visit(String key, RadixTreeNode<T> parent,
-                    RadixTreeNode<T> node) {
+            public void visit(Text key, RadixTreeNode<T> parent,
+                              RadixTreeNode<T> node) {
                 result = node.isReal();
             }
 
@@ -316,13 +320,14 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
 
         return ((Boolean) visitor.getResult()).booleanValue();
     }
-    
+
     /**
      * visit the node those key matches the given key
-     * @param key The key that need to be visited
+     *
+     * @param key     The key that need to be visited
      * @param visitor The visitor object
      */
-    public void visit(String key, Visitor<T> visitor) {
+    public void visit(Text key, Visitor<T> visitor) {
         if (root != null)
             visit(key, visitor, null, root);
     }
@@ -330,19 +335,16 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
     /**
      * recursively visit the tree based on the supplied "key". calls the Visitor
      * for the node those key matches the given prefix
-     * 
-     * @param prefix
-     *            The key o prefix to search in the tree
-     * @param visitor
-     *            The Visitor that will be called if a node with "key" as its
-     *            key is found
-     * @param node
-     *            The Node from where onward to search
+     *
+     * @param prefix  The key o prefix to search in the tree
+     * @param visitor The Visitor that will be called if a node with "key" as its
+     *                key is found
+     * @param node    The Node from where onward to search
      */
-    private void visit(String prefix, Visitor<T> visitor,
-            RadixTreeNode<T> parent, RadixTreeNode<T> node) {
-        
-    	int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(prefix);
+    void visit(Text prefix, Visitor<T> visitor,
+               RadixTreeNode<T> parent, RadixTreeNode<T> node) {
+
+        int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(prefix);
 
         // if the node key and prefix match, we found a match!
         if (numberOfMatchingCharacters == prefix.length() && numberOfMatchingCharacters == node.getKey().length()) {
@@ -351,7 +353,7 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
                 // root
                 || (numberOfMatchingCharacters < prefix.length() && numberOfMatchingCharacters >= node.getKey().length())) { // OR we need to
             // traverse the childern
-            String newText = prefix.substring(numberOfMatchingCharacters, prefix.length());
+            Text newText = prefix.subtext(numberOfMatchingCharacters, prefix.length());
             for (RadixTreeNode<T> child : node.getChildern()) {
                 // recursively search the child nodes
                 if (child.getKey().startsWith(newText.charAt(0) + "")) {
@@ -361,7 +363,7 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
             }
         }
     }
-    
+
 
     /**
      * Display the Trie on console. WARNING! Do not use for large Trie. For
@@ -373,7 +375,7 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
     }
 
     @Deprecated
-    private void display(int level, RadixTreeNode<T> node) {
+    void display(int level, RadixTreeNode<T> node) {
         for (int i = 0; i < level; i++) {
             System.out.print(" ");
         }
@@ -394,5 +396,9 @@ public class RadixTreeImpl<T> implements RadixTree<T> {
 
     public long getSize() {
         return size;
+    }
+
+    public void insert(String key, T value) {
+        insert(Text.intern(key), (T) value);
     }
 }
