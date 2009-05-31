@@ -7,7 +7,6 @@ import javolution.text.Text;
 import java.util.ArrayList;
 
  import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /**
  * Unit test for simple App.

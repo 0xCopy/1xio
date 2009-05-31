@@ -27,6 +27,8 @@ package ds.tree;
 import javolution.text.Text;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * This interface represent the operation of a radix tree. A radix tree,
@@ -86,7 +88,7 @@ public interface RadixTree<T> {
      * @param recordLimit The limit for the results
      * @return The list of values those key start with the given prefix
      */
-    public ArrayList<T> searchPrefix(Text prefix, int recordLimit);
+    public List<T> searchPrefix(Text prefix, int recordLimit);
     
     /**
      * Return the size of the Radix tree
