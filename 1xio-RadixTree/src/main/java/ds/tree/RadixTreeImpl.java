@@ -51,7 +51,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
     public RadixTreeImpl() {
 
         super(new RadixTreeNode<T>(), new AtomicLong(0));
-        $1().setKey(Text.EMPTY);
+        $1().key = Text.EMPTY;
     }
 
     @SuppressWarnings("unchecked")
@@ -62,8 +62,8 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
             public void visit(Text key, RadixTreeNode<T> parent,
                               RadixTreeNode<T> node) {
-                if (node.isReal())
-                    result = node.getValue();
+                if (node.real)
+                    result = node.value;
             }
 
             public Object getResult() {
@@ -82,18 +82,18 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
             public void visit(Text key, RadixTreeNode<T> parent,
                               RadixTreeNode<T> node) {
-                delete = node.isReal();
+                delete = node.real;
 
                 // if it is a real node
                 if (delete) {
                     // If there no children of the node we need to
                     // delete it from the its parent children list
-                    if (node.getChildern().size() == 0) {
-                        final List<RadixTreeNode<T>> childern = parent.getChildern();
+                    if (node.nodes.size() == 0) {
+                        final List<RadixTreeNode<T>> childern = parent.nodes;
                         Iterator<RadixTreeNode<T>> it = childern.iterator();
 
                         while (it.hasNext()) {
-                            if (it.next().getKey().equals(node.getKey())) {
+                            if (it.next().key.equals(node.key)) {
                                 it.remove();
                                 break;
                             }
@@ -101,15 +101,17 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
                         // if parent is not real node and has only one child
                         // then they need to be merged.
-                        if (parent.getChildern().size() == 1 && !parent.isReal()) {
-                            mergeNodes(parent, parent.getChildern().get(0));
+                        if (parent.nodes.size() == 1 && !parent.real) {
+                            mergeNodes(parent, parent.nodes.get(0));
                         }
-                    } else if (node.getChildern().size() == 1) {
-                        // we need to merge the only child of this node with
-                        // itself
-                        mergeNodes(node, node.getChildern().get(0));
-                    } else { // we jus need to mark the node as non real.
-                        node.setReal(false);
+                    } else {
+                        if (node.nodes.size() == 1) {
+                            // we need to merge the only child of this node with
+                            // itself
+                            mergeNodes(node, node.nodes.get(0));
+                        } else { // we jus need to mark the node as non real.
+                            node.real = false;
+                        }
                     }
                 }
             }
@@ -125,10 +127,10 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
              */
             void mergeNodes(RadixTreeNode<T> parent,
                             RadixTreeNode<T> child) {
-                parent.setKey(parent.getKey().plus(child.getKey()));
-                parent.setReal(child.isReal());
-                parent.setValue(child.getValue());
-                parent.setChildern(child.getChildern());
+                parent.key = parent.key.plus(child.key);
+                parent.real = child.real;
+                parent.value = child.value;
+                parent.nodes = child.nodes;
             }
 
             public Object getResult() {
@@ -178,59 +180,59 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
         // we are either at the $1 node
         // or we need to go down the tree
-        if (!node.getKey().isBlank()
+        if (!node.key.isBlank()
                 && numberOfMatchingCharacters != 0
                 && (numberOfMatchingCharacters >= key.length()
-                || numberOfMatchingCharacters < node.getKey().length())) {
-            if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters == node.getKey().length()) {
+                || numberOfMatchingCharacters < node.key.length())) {
+            if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters == node.key.length()) {
 
-                if (node.isReal()) {
+                if (node.real) {
                     throw new DuplicateKeyException(Text.intern("Duplicate key"));
                 } else {
-                    node.setReal(value != null);
-                    node.setValue(value);
+                    node.real = value != null;
+                    node.value = value;
                 }
             }
             // This node need to be split as the key to be inserted
             // is a prefix of the current node key
             else {
                 if (numberOfMatchingCharacters > 0
-                        && numberOfMatchingCharacters < node.getKey().length()) {
+                        && numberOfMatchingCharacters < node.key.length()) {
                     RadixTreeNode<T> n1 = new RadixTreeNode<T>();
-                    n1.setKey(node.getKey().subtext(numberOfMatchingCharacters, node.getKey().length()));
-                    n1.setReal(node.isReal());
-                    n1.setValue(node.getValue());
-                    n1.setChildern(node.getChildern());
+                    n1.key = node.key.subtext(numberOfMatchingCharacters, node.key.length());
+                    n1.real = node.real;
+                    n1.value = node.value;
+                    n1.nodes = node.nodes;
 
-                    node.setKey(key.subtext(0, numberOfMatchingCharacters));
-                    node.setReal(false);
-                    node.setChildern(new ArrayList<RadixTreeNode<T>>());
-                    node.getChildern().add(n1);
+                    node.key = key.subtext(0, numberOfMatchingCharacters);
+                    node.real = false;
+                    node.nodes = new ArrayList<RadixTreeNode<T>>();
+                    node.nodes.add(n1);
 
                     if (numberOfMatchingCharacters >= key.length()) {
-                        node.setValue(value);
-                        node.setReal(true);
+                        node.value = value;
+                        node.real = true;
                     } else {
                         RadixTreeNode<T> n2 = new RadixTreeNode<T>();
-                        n2.setKey(key.subtext(numberOfMatchingCharacters, key.length()));
-                        n2.setReal(true);
-                        n2.setValue(value);
-                        node.getChildern().add(n2);
+                        n2.key = key.subtext(numberOfMatchingCharacters, key.length());
+                        n2.real = true;
+                        n2.value = value;
+                        node.nodes.add(n2);
                     }
                 }
                 // this key need to be added as the child of the current node
                 else {
                     RadixTreeNode<T> n = new RadixTreeNode<T>();
-                    n.setKey(node.getKey().subtext(numberOfMatchingCharacters, node.getKey().length()));
-                    n.setChildern(node.getChildern());
-                    n.setReal(node.isReal());
-                    n.setValue(node.getValue());
+                    n.key = node.key.subtext(numberOfMatchingCharacters, node.key.length());
+                    n.nodes = node.nodes;
+                    n.real = node.real;
+                    n.value = node.value;
 
-                    node.setKey(key);
-                    node.setReal(true);
-                    node.setValue(value);
+                    node.key = key;
+                    node.real = true;
+                    node.value = value;
 
-                    node.getChildern().add(n);
+                    node.nodes.add(n);
                 }
 
 
@@ -241,8 +243,8 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         else {
             boolean flag = false;
             Text newText = key.subtext(numberOfMatchingCharacters, key.length());
-            for (RadixTreeNode<T> child : node.getChildern()) {
-                if (child.getKey().startsWith(newText.charAt(0) + "")) {
+            for (RadixTreeNode<T> child : node.nodes) {
+                if (child.key.startsWith(newText.charAt(0) + "")) {
                     flag = true;
                     insert(newText, child, value);
                     break;
@@ -252,11 +254,11 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             // just add the node as the child of the current node
             if (flag == false) {
                 RadixTreeNode<T> n = new RadixTreeNode<T>();
-                n.setKey(newText);
-                n.setReal(true);
-                n.setValue(value);
+                n.key = newText;
+                n.real = true;
+                n.value = value;
 
-                node.getChildern().add(n);
+                node.nodes.add(n);
             }
         }
 
@@ -269,8 +271,8 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         RadixTreeNode<T> node = searchPefix(key, $1());
 
         if (node != null) {
-            if (node.isReal()) {
-                keys.add(node.getValue());
+            if (node.real) {
+                keys.add(node.value);
             }
             getNodes(node, keys, recordLimit);
         }
@@ -281,19 +283,19 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
     void getNodes(RadixTreeNode<T> parent, ArrayList<T> keys, int limit) {
         Queue<RadixTreeNode<T>> queue = new LinkedList<RadixTreeNode<T>>();
 
-        queue.addAll(parent.getChildern());
+        queue.addAll(parent.nodes);
 
         while (!queue.isEmpty()) {
             RadixTreeNode<T> node = queue.remove();
-            if (node.isReal()) {
-                keys.add(node.getValue());
+            if (node.real) {
+                keys.add(node.value);
             }
 
             if (keys.size() == limit) {
                 break;
             }
 
-            queue.addAll(node.getChildern());
+            queue.addAll(node.nodes);
         }
     }
 
@@ -302,16 +304,18 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(key);
 
-        if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters <= node.getKey().length()) {
+        if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters <= node.key.length()) {
             result = node;
-        } else if (node.getKey().isBlank()
-                || numberOfMatchingCharacters < key.length()
-                && numberOfMatchingCharacters >= node.getKey().length()) {
-            Text newText = key.subtext(numberOfMatchingCharacters, key.length());
-            for (RadixTreeNode<T> child : node.getChildern()) {
-                if (child.getKey().startsWith(newText.charAt(0) + "")) {
-                    result = searchPefix(newText, child);
-                    break;
+        } else {
+            if (node.key.isBlank()
+                    || numberOfMatchingCharacters < key.length()
+                    && numberOfMatchingCharacters >= node.key.length()) {
+                Text newText = key.subtext(numberOfMatchingCharacters, key.length());
+                for (RadixTreeNode<T> child : node.nodes) {
+                    if (child.key.startsWith(newText.charAt(0) + "")) {
+                        result = searchPefix(newText, child);
+                        break;
+                    }
                 }
             }
         }
@@ -325,7 +329,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
             public void visit(Text key, RadixTreeNode<T> parent,
                               RadixTreeNode<T> node) {
-                result = node.isReal();
+                result = node.real;
             }
 
             public Object getResult() {
@@ -367,20 +371,22 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(prefix);
 
         // if the node key and prefix match, we found a match!
-        if (numberOfMatchingCharacters == prefix.length() && numberOfMatchingCharacters == node.getKey().length()) {
+        if (numberOfMatchingCharacters == prefix.length() && numberOfMatchingCharacters == node.key.length()) {
             visitor.visit(prefix, parent, node);
-        } else if (node.getKey().isBlank()// either we are at the
-                // $1
-                || numberOfMatchingCharacters < prefix.length()
-                && numberOfMatchingCharacters >= node.getKey().length()) {
-            // OR we need to
-            // traverse the childern
-            Text newText = prefix.subtext(numberOfMatchingCharacters, prefix.length());
-            for (RadixTreeNode<T> child : node.getChildern()) {
-                // recursively search the child nodes
-                if (child.getKey().startsWith(newText.charAt(0) + "")) {
-                    visit(newText, visitor, node, child);
-                    break;
+        } else {
+            if (node.key.isBlank()// either we are at the
+                    // $1
+                    || numberOfMatchingCharacters < prefix.length()
+                    && numberOfMatchingCharacters >= node.key.length()) {
+                // OR we need to
+                // traverse the nodes
+                Text newText = prefix.subtext(numberOfMatchingCharacters, prefix.length());
+                for (RadixTreeNode<T> child : node.nodes) {
+                    // recursively search the child nodes
+                    if (child.key.startsWith(newText.charAt(0) + "")) {
+                        visit(newText, visitor, node, child);
+                        break;
+                    }
                 }
             }
         }
@@ -406,13 +412,13 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             System.out.print("-");
         }
 
-        if (node.isReal()) {
-            System.out.println(node.getKey() + "[" + node.getValue() + "]*");
+        if (node.real) {
+            System.out.println(node.key + "[" + node.value + "]*");
         } else {
-            System.out.println(node.getKey());
+            System.out.println(node.key);
         }
 
-        for (RadixTreeNode<T> child : node.getChildern()) {
+        for (RadixTreeNode<T> child : node.nodes) {
             display(level + 1, child);
         }
     }

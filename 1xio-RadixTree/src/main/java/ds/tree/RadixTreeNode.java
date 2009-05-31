@@ -31,76 +31,29 @@ import java.util.List;
 
 /**
  * Represents a node of a Radix tree {@link RadixTreeImpl}
- * 
+ *
  * @author Tahseen Ur Rehman
  * @email tahseen.ur.rehman {at.spam.me.not} gmail.com
  * @param <T>
  */
 class RadixTreeNode<T> {
-    private Text key;
+    Text key = Text.EMPTY;
 
-    private List<RadixTreeNode<T>> childern;
+    List<RadixTreeNode<T>> nodes = new ArrayList<RadixTreeNode<T>>();
 
-    private boolean real;
+    boolean real = false;
 
-    private T value;
+    T value;
 
-    /**
-     * intailize the fields with default values to avoid null reference checks
-     * all over the places
-     */
-    public RadixTreeNode() {
-        key = Text.EMPTY;
-        childern = new ArrayList<RadixTreeNode<T>>();
-        real = false;
-    }
-
-    public T getValue() {
-        return value;
-    }
-
-    public void setValue(T data) {
-        this.value = data;
-    }
-
-    public Text getKey() {
-        return key;
-    }
-
-    public void setKey(Text value) {
-        this.key = value;
-    }
-
-    public boolean isReal() {
-        return real;
-    }
-
-    public void setReal(boolean datanode) {
-        this.real = datanode;
-    }
-
-    public List<RadixTreeNode<T>> getChildern() {
-        return childern;
-    }
-
-    public void setChildern(List<RadixTreeNode<T>> childern) {
-        this.childern = childern;
-    }
-    
-
-	public int getNumberOfMatchingCharacters(Text key) {
-		int numberOfMatchingCharacters = 0;
-        while (numberOfMatchingCharacters < key.length() && numberOfMatchingCharacters < this.getKey().length()) {
-            if (key.charAt(numberOfMatchingCharacters) != this.getKey().charAt(numberOfMatchingCharacters)) {
+    public int getNumberOfMatchingCharacters(Text key) {
+        int numberOfMatchingCharacters = 0;
+        while (numberOfMatchingCharacters < key.length() && numberOfMatchingCharacters < this.key.length()) {
+            if (key.charAt(numberOfMatchingCharacters) != this.key.charAt(numberOfMatchingCharacters)) {
                 break;
             }
             numberOfMatchingCharacters++;
         }
-		return numberOfMatchingCharacters;
-	}
-
-    public Text toText() {
-		return key;
-    	
+        return numberOfMatchingCharacters;
     }
+
 }
