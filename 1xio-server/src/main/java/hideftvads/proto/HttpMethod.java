@@ -1,6 +1,8 @@
 package hideftvads.proto;
 
 import alg.Pair;
+import alg.Tuple;
+import ds.tree.DuplicateKeyException;
 import ds.tree.RadixTree;
 import ds.tree.RadixTreeImpl;
 import static hideftvads.proto.HttpStatus.*;
@@ -11,15 +13,15 @@ import java.io.RandomAccessFile;
 import static java.lang.Character.isWhitespace;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.*;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -38,7 +40,42 @@ public enum HttpMethod {
             Xfer xfer = (Xfer) a[1];
             xfer.sendChunk(key);
         }
+        /**
+         * we are a proxy
+         *
+         * @param key
+         */
+        @Override
+        public void onConnect(final SelectionKey key) {
+            final SocketChannel channel = (SocketChannel) key.channel();
+            try {
+                if (channel.finishConnect()) {
 
+                    final Object[] o = (Object[]) key.attachment();
+                    final HttpMethod o1 = (HttpMethod) o[0];
+                    final RadixTree tree = (RadixTree) o[1];
+                    final ByteBuffer src = (ByteBuffer) o[2];
+                    LinkedList<Pair<Integer, LinkedList<Integer>>> lines = (LinkedList<Pair<Integer, LinkedList<Integer>>>) o[3];
+
+                    final CharBuffer buffer = extractUri(src, lines);
+                    final String str = buffer.toString();
+                    final URI uri = new URI(str);
+
+                    final String path = uri.normalize().getPath();
+                    final String query = uri.getQuery();
+                    final String fragment = uri.getFragment();
+
+                    MethodExtract methodExtract = new MethodExtract(o, path, query, fragment).invoke();
+                    Text r = methodExtract.getR();
+
+                    System.err.println(":::"+r);
+                }
+            } catch (Exception e) {
+                key.cancel();
+                e.printStackTrace();
+            }
+
+        }
         /**
          * enrolls a new SelectionKey to the methods
          *
@@ -55,9 +92,9 @@ public enum HttpMethod {
                 final LinkedList<Pair<Integer, LinkedList<Integer>>> lines = preIndex(src);
 
                 final int fnend = lines.get(0).$2().get(1) - 1;
-                final Text fname = Text.intern(UTF8.decode((ByteBuffer) src.limit(fnend).position(margin)));
-                final RadixTree<Pair<Integer, Integer>> tree = new RadixTreeImpl<Pair<Integer, Integer>>();
-                RadixTree<CharBuffer> tree2 = new RadixTreeImpl<CharBuffer>();
+                final Text path = Text.intern(UTF8.decode((ByteBuffer) src.limit(fnend).position(margin)));
+                final RadixTree<Pair<Integer, Integer>> requestMap = new RadixTreeImpl<Pair<Integer, Integer>>();
+                RadixTree<CharBuffer> displayOnlyTree = new RadixTreeImpl<CharBuffer>();
 
                 for (int i = 1; i < lines.size(); i++) {
                     Pair<Integer, LinkedList<Integer>> line = lines.get(i);
@@ -65,58 +102,78 @@ public enum HttpMethod {
                     if (null != tokens && !tokens.isEmpty()) {
                         final Integer newLimit = tokens.getFirst();
                         final Integer position = line.$1();
+                        Text rkey = Text.valueOf(UTF8.decode((ByteBuffer) src.limit(newLimit - 2).position(position)));
+                        requestMap.insert(rkey, new Pair<Integer, Integer>(newLimit + 1, tokens.getLast() - 1));
+                        displayOnlyTree.insert(rkey, UTF8.decode((ByteBuffer) src.limit(tokens.getLast() - 1).position(newLimit)));
+//
+//                        requestMap.display();
+//                        displayOnlyTree.display();
+                        final String s = Tuple.XSTREAM.toXML(requestMap);
+                        System.err.println(s);
 
-                            Text rkey = Text.valueOf(UTF8.decode((ByteBuffer) src.limit(newLimit - 2).position(position)));
-                            tree.insert(rkey, new Pair<Integer, Integer>(newLimit + 1, tokens.getLast() - 1));
-                            tree2.insert(rkey, UTF8.decode((ByteBuffer) src.limit(tokens.getLast() - 1).position(newLimit)));
-
-                            tree.display();
-                            tree2.display();
-                            System.out.println("================");
-                        
+                        System.out.println("================");
                     }
-
-
                 }
 
+                if (path.startsWith(HTTP_PREFIX)) {
+                    final URI uri = URI.create(path.toString()).normalize();
 
-                final RandomAccessFile fnode = new RandomAccessFile("./" + fname, "r");
+                    final String host = uri.getHost();
+                    final int port = uri.getPort();
+                    SocketChannel sc = SocketChannel.open();
+                    sc.configureBlocking(false);
+                    sc.socket().setTcpNoDelay(true);
+                    sc.connect(new InetSocketAddress(host, port));
+                    final SelectionKey proxy = sc.register(key.selector(), SelectionKey.OP_CONNECT);
+                    key.attach(new Object[]{this, requestMap, src, proxy});
 
-                if (fnode.getFD().valid()) {
-                    final FileChannel fc = fnode.getChannel();
-                    final SocketChannel channel = (SocketChannel) key.channel();
-                    final Xfer xfer = new Xfer(fc, fname);
-                    response(key, $200);
-                    final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
+
+                } else {
                     try {
-                        final ByteBuffer buffer1 = byteBufferReference.get();
-                        MimeType mimeType = null;
-                        try {
-                            mimeType = MimeType.valueOf(fname.subtext(fname.lastIndexOf(".") + 1).toString());
-                        } catch (Exception ignored) {
+                        final RandomAccessFile fnode = new RandomAccessFile(path.toString(), "r");
+
+                        if (fnode.getFD().valid()) {
+                            final FileChannel fc = fnode.getChannel();
+                            final SocketChannel channel = (SocketChannel) key.channel();
+                            final Xfer xfer = new Xfer(fc, path);
+                            response(key, $200);
+                            final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
+                            try {
+                                final ByteBuffer buffer1 = byteBufferReference.get();
+                                MimeType mimeType = null;
+                                try {
+                                    mimeType = MimeType.valueOf(path.subtext(path.lastIndexOf(".") + 1).toString());
+                                } catch (Exception ignored) {
+                                }
+                                String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
+                                final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n").append(mimeHeader).append("Content-Length: ").append(String.valueOf(fc.size())).append("\n\n").flip();
+                                channel.write(UTF8.encode(c));
+
+
+                                key.attach(new Object[]{this, xfer});
+                                key.interestOps(SelectionKey.OP_WRITE);
+                            } catch (Exception ignored) {
+                            } finally {
+                                recycle(byteBufferReference, DEFAULT_EXP);
+                            }
+                            return;
                         }
-                        String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
-                        final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n").append(mimeHeader).append("Content-Length: ").append(String.valueOf(fc.size())).append("\n\n").flip();
-                        channel.write(UTF8.encode(c));
-
-
-                        key.attach(new Object[]{this, xfer});
-                        key.interestOps(SelectionKey.OP_WRITE);
-                    } catch (Exception e) {
-                    } finally {
-                        recycle(byteBufferReference, DEFAULT_EXP);
+                    } catch (Exception
+                            e) {
+                        e.printStackTrace();
                     }
-                    return;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            try {
-                response(key, $404);
-                key.cancel();
+                try {
+                    response(key, $404);
+                    key.cancel();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } catch (DuplicateKeyException ignored) {
             } catch (IOException e) {
-                e.printStackTrace();
+                e.printStackTrace();  //TODO: verify for a purpose
             }
+
         }
 
         class Xfer {
@@ -210,7 +267,20 @@ public enum HttpMethod {
 
         }},
 
-    POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION,
+    POST, PUT, HEAD, DELETE, TRACE, CONNECT {
+        @Override
+        public void onWrite(SelectionKey k) {
+            final SelectionKey selectionKey = k;
+            final Object o[] = (Object[]) selectionKey.attachment();
+
+
+            RadixTree tree = (RadixTree) o[1];
+            ByteBuffer request = (ByteBuffer) o[2];
+            LinkedList<Pair<Integer, LinkedList<Integer>>> lines = (LinkedList<Pair<Integer, LinkedList<Integer>>>) o[3];
+            SocketChannel c = (SocketChannel) k.channel();
+
+
+        }}, OPTIONS, HELP, VERSION,
     $ {
 
         public void onAccept(SelectionKey selectionKey) {
@@ -229,7 +299,7 @@ public enum HttpMethod {
                         if (client != null) {
                             client.close();
                         }
-                    } catch (IOException e1) {
+                    } catch (IOException ignored) {
                     }
                 }
             }
@@ -242,9 +312,7 @@ public enum HttpMethod {
          */
         @Override
         public void onWrite(SelectionKey key) {
-
             final Object[] att = (Object[]) key.attachment();
-
             if (att != null) {
                 HttpMethod method = (HttpMethod) att[0];
                 method.onWrite(key);
@@ -280,9 +348,7 @@ public enum HttpMethod {
 
                     byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
                     try {
-                        final ByteBuffer buffer =
-
-                                byteBufferReference.get();
+                        final ByteBuffer buffer = byteBufferReference.get();
                         final int i = channel.read(buffer);
 
                         buffer.flip().mark();
@@ -298,7 +364,7 @@ public enum HttpMethod {
 
                         response(key, HttpStatus.$400);
                         channel.write(buffer);
-                    } catch (Exception e) {
+                    } catch (Exception ignored) {
                     } finally {
                         recycle(byteBufferReference, DEFAULT_EXP);
                     }
@@ -316,6 +382,16 @@ public enum HttpMethod {
         }
 
     },;
+
+    private static CharBuffer extractUri(ByteBuffer src, LinkedList<Pair<Integer, LinkedList<Integer>>> lines) {
+        final Integer seek = lines.getFirst().$2().get(1) + 1;
+        int limit = lines.getFirst().$2().get(2) - 1;
+        src.limit(limit).position(seek);
+        final CharBuffer buffer = UTF8.decode(src);
+        return buffer;
+    }
+
+    private static final String HTTP_PREFIX = "http://".intern();
 
     private static LinkedList<Pair<Integer, LinkedList<Integer>>> preIndex(ByteBuffer src) {
         LinkedList<Pair<Integer, LinkedList<Integer>>> lines = new LinkedList<Pair<Integer, LinkedList<Integer>>>();
@@ -480,11 +556,11 @@ public enum HttpMethod {
             c.write((ByteBuffer) b.rewind());
 
 
-        } catch (IOException e) {
+        } catch (IOException ignored) {
         } finally {
             try {
                 key.channel().close();
-            } catch (IOException e) {
+            } catch (IOException ignored) {
             }
             key.cancel();
 
@@ -505,7 +581,7 @@ public enum HttpMethod {
 
 
             ((SocketChannel) key.channel()).write(out);
-        } catch (Exception e) {
+        } catch (Exception ignored) {
         } finally {
             recycle(byteBufferReference, DEFAULT_EXP);
         }
@@ -631,6 +707,46 @@ public enum HttpMethod {
         public Text call() throws Exception {
             return Text.intern(UTF8.decode(src).toString());
 
+        }
+    }
+
+    public static class MethodExtract {
+        private Object[] o;
+        private String path;
+        private String query;
+        private String fragment;
+        private Text r;
+
+        public MethodExtract(Object[] o, String path, String query, String fragment) {
+            this.o = o;
+            this.path = path;
+            this.query = query;
+            this.fragment = fragment;
+        }
+
+        public Text getR() {
+            return r;
+        }
+
+        public MethodExtract invoke() {
+            r = Text.valueOf(path);
+            if (query != null && !query.isEmpty()) {
+                r.plus("?").plus(query);
+            }
+            if (fragment != null && !fragment.isEmpty()) {
+                r.plus("#").plus(fragment);
+            }
+
+            if (r.isBlank()) {
+                return this;
+            }
+            r = Text.valueOf("GET ").plus(r).plus(" HTTP/1.1\r\n");
+
+            final ArrayList arrayList = new ArrayList(Arrays.asList(o));
+            arrayList.add(r);
+
+
+            return this;
         }
     }
 };
