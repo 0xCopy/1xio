@@ -44,7 +44,7 @@ import java.util.List;
  * @author Tahseen Ur Rehman
  *         email: tahseen.ur.rehman {at.spam.me.not} gmail.com
  */
-public interface RadixTree<T> {
+public interface RadixTree<T>  {
     /**
      * Insert a new text key and its value to the tree.
      *
@@ -101,4 +101,6 @@ public interface RadixTree<T> {
     RadixTree<T> insert(Pair<Text, T>... pair);
 
     RadixTree<T> insert(Iterable<Pair<Text, T>>... pair);
+
+    RadixTree<T> display();
 }

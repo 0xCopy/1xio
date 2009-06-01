@@ -1,5 +1,6 @@
 package alg;
 
+import java.util.Arrays;
 
 
 /**
@@ -7,7 +8,7 @@ package alg;
  * Date: May 13, 2009
  * Time: 7:11:18 AM
  */
-public class Pair<$1, $2> implements Tuple{
+public class Pair<$1, $2>   implements Tuple{
     Object[] v;
 
             static
@@ -17,6 +18,10 @@ public class Pair<$1, $2> implements Tuple{
 
     public Pair(Object... v) {
         this.v = v;
+    }
+
+    public Pair($1 $1, $2 $2) {
+        v=new Object[]{$1,$2};
     }
 
     public $1 $1() {
@@ -49,4 +54,6 @@ public class Pair<$1, $2> implements Tuple{
 
     }
 
+    public String toString(){
+        return Arrays.toString(v);}
 }

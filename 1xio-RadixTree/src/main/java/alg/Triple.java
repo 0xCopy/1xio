@@ -1,5 +1,7 @@
 package alg;
 
+import java.util.Arrays;
+
 
 /**
  * Copyright hideftvads.com 2009 all rights reserved.
@@ -8,16 +10,20 @@ package alg;
  * Date: May 15, 2009
  * Time: 8:21:44 PM
  */
-public class Triple<$1, $2, $3> implements Tuple{
+public class Triple<$1, $2, $3> implements Tuple {
     Object[] v;
 
     static {
         XSTREAM.aliasType("triple", Triple.class);
 
-     }
+    }
 
     public Triple(Object... v) {
         this.v = v;
+    }
+
+    public Triple($1 $1, $2 $2,$3 $3) {
+        v=new Object[]{$1,$2,$3};
     }
 
     public $1 $1() {
@@ -40,7 +46,7 @@ public class Triple<$1, $2, $3> implements Tuple{
                 ($1) (v[0] = $1)
                 : ($1) (this.v = new Object[]
                 {$1, $2(), $3()})[0];
-        return    this;
+        return this;
     }
 
     public Triple $2($2 $2) {
@@ -49,7 +55,7 @@ public class Triple<$1, $2, $3> implements Tuple{
                 : ($2) (this.v = new Object[]
                 {$1(), $2, $3()})[1];
 
-        return     this;
+        return this;
 
     }
 
@@ -58,6 +64,10 @@ public class Triple<$1, $2, $3> implements Tuple{
                 ($3) (v[2] = $3)
                 : ($3) (this.v = new Object[]
                 {$1(), $2(), $3})[2];
-        return     this; 
+        return this;
+    }
+
+    public String toString() {
+        return Arrays.toString(v);
     }
 }

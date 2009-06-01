@@ -41,7 +41,7 @@
                     </descriptorId>
                     <archive>
                         <manifest>
-                            <mainClass>hideftvads.proto.HttpMethod</mainClass>
+                            <mainClass>hideftvads.server.Agent</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

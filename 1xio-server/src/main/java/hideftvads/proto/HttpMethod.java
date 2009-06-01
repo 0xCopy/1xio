@@ -1,6 +1,10 @@
 package hideftvads.proto;
 
+import alg.Pair;
+import ds.tree.RadixTree;
+import ds.tree.RadixTreeImpl;
 import static hideftvads.proto.HttpStatus.*;
+import javolution.text.Text;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -13,6 +17,7 @@ import java.nio.channels.*;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
+import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.Callable;
@@ -33,9 +38,6 @@ public enum HttpMethod {
             Xfer xfer = (Xfer) a[1];
             xfer.sendChunk(key);
         }
-        public void onConnect(final SelectionKey key) {
-            onAccept(key);
-        }
 
         /**
          * enrolls a new SelectionKey to the methods
@@ -45,22 +47,42 @@ public enum HttpMethod {
          */
         @Override
         public void onAccept(final SelectionKey key) {
-
             try {
                 assert key.attachment() instanceof ByteBuffer;
-                final ByteBuffer buffer = (ByteBuffer) key.attachment();
-                final CharSequence parameters = methodParameters(buffer);
+                final ByteBuffer src = (ByteBuffer) key.attachment();
 
 
-                final String[] strings = parameters.toString().split(" ");
-                final String fname = strings[0];
+                final LinkedList<Pair<Integer, LinkedList<Integer>>> lines = preIndex(src);
+
+                final int fnend = lines.get(0).$2().get(1) - 1;
+                final Text fname = Text.intern(UTF8.decode((ByteBuffer) src.limit(fnend).position(margin)));
+                final RadixTree<Pair<Integer, Integer>> tree = new RadixTreeImpl<Pair<Integer, Integer>>();
+                RadixTree<CharBuffer> tree2 = new RadixTreeImpl<CharBuffer>();
+
+                for (int i = 1; i < lines.size(); i++) {
+                    Pair<Integer, LinkedList<Integer>> line = lines.get(i);
+                    LinkedList<Integer> tokens = line.$2();
+                    if (null != tokens && !tokens.isEmpty()) {
+                        final Integer newLimit = tokens.getFirst();
+                        final Integer position = line.$1();
+
+                            Text rkey = Text.valueOf(UTF8.decode((ByteBuffer) src.limit(newLimit - 2).position(position)));
+                            tree.insert(rkey, new Pair<Integer, Integer>(newLimit + 1, tokens.getLast() - 1));
+                            tree2.insert(rkey, UTF8.decode((ByteBuffer) src.limit(tokens.getLast() - 1).position(newLimit)));
+
+                            tree.display();
+                            tree2.display();
+                            System.out.println("================");
+                        
+                    }
+
+
+                }
 
 
                 final RandomAccessFile fnode = new RandomAccessFile("./" + fname, "r");
 
-
                 if (fnode.getFD().valid()) {
-
                     final FileChannel fc = fnode.getChannel();
                     final SocketChannel channel = (SocketChannel) key.channel();
                     final Xfer xfer = new Xfer(fc, fname);
@@ -70,12 +92,11 @@ public enum HttpMethod {
                         final ByteBuffer buffer1 = byteBufferReference.get();
                         MimeType mimeType = null;
                         try {
-                            mimeType = MimeType.valueOf(fname.substring(fname.lastIndexOf('.') + 1));
+                            mimeType = MimeType.valueOf(fname.subtext(fname.lastIndexOf(".") + 1).toString());
                         } catch (Exception ignored) {
-//                            throw new IOError(ignored);
                         }
-                        String x = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
-                        final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n" + x + "Content-Length: " + fc.size()).append("\n\n").flip();
+                        String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
+                        final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n").append(mimeHeader).append("Content-Length: ").append(String.valueOf(fc.size())).append("\n\n").flip();
                         channel.write(UTF8.encode(c));
 
 
@@ -117,14 +138,13 @@ public enum HttpMethod {
 //                        Context.enter(LogContext.class);
                         try {
                             try {
-//                                 key.channel();
 
                                 progress += fc.transferTo(progress, Math.min(getRemaining(), ++chunk << 8), (WritableByteChannel) key.channel());
                                 if (getRemaining() < 1) {
 
                                     completion = System.currentTimeMillis();
                                     final double span = (double) completion - creation / 1000.0;
-                                    final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName() + '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + (fc.size() / span) + ' ' + "chunkavg " + (fc.size() / chunk);
+                                    final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName() + '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + fc.size() / span + ' ' + "chunkavg " + fc.size() / chunk;
                                     System.err.println(s);
                                     try {
                                         fc.close();
@@ -201,7 +221,7 @@ public enum HttpMethod {
                     final ServerSocketChannel socketChannel = (ServerSocketChannel) selectionKey.channel();
 
                     client = socketChannel.accept();
-                    client.configureBlocking(false).register(selectionKey.selector() , SelectionKey.OP_READ);
+                    client.configureBlocking(false).register(selectionKey.selector(), SelectionKey.OP_READ);
                 } catch (IOException e) {
 
                     e.printStackTrace();
@@ -271,7 +291,8 @@ public enum HttpMethod {
                             if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
                                 //System.out.println("found: " + httpMethod);
                                 key.attach(buffer);
-                                httpMethod.onConnect(key);
+
+                                httpMethod.onAccept(key);
                                 return;
                             }
 
@@ -296,6 +317,43 @@ public enum HttpMethod {
 
     },;
 
+    private static LinkedList<Pair<Integer, LinkedList<Integer>>> preIndex(ByteBuffer src) {
+        LinkedList<Pair<Integer, LinkedList<Integer>>> lines = new LinkedList<Pair<Integer, LinkedList<Integer>>>();
+        final int pos = src.position();
+        lines.add(new Pair<Integer, LinkedList<Integer>>(pos, new LinkedList<Integer>()));
+
+        byte prev = 0;
+
+        L1:
+
+
+        while (src.hasRemaining()) {
+            byte b = src.get();
+
+            switch (b) {
+                case EOL:
+                    if (prev == EOL) {
+                        break L1;
+                    }
+                    lines.add(new Pair<Integer, LinkedList<Integer>>(src.position(), new LinkedList<Integer>()));
+
+
+                    break;
+                case '\r':
+                default:
+                    if (!isWhitespace(b) && '\r' != b || isWhitespace(prev)) {
+                    } else {
+                        lines.getLast().$2().add(src.position());
+                    }
+                    break;
+            }
+            prev = b;
+        }
+        return lines;
+    }
+
+    private static final int EOL = '\n' & 0xff;
+
 
     private static final int DEFAULT_EXP = 0;
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
@@ -303,7 +361,9 @@ public enum HttpMethod {
 
     final int margin = name().length() + 1;
     static final Charset UTF8 = Charset.forName("UTF8");
- 
+    private static final byte[] FIREFOX_ENDLINE = new byte[]{'\r', '\n',
+            0};
+
 
     /**
      * deduce a few parse optimizations
@@ -345,7 +405,7 @@ public enum HttpMethod {
             b = (char) (in.get() & 0xff);
             isBlank = isWhitespace(b & 0xff);
 
-            if ((!isBlank) && wasBlank) {
+            if (!isBlank && wasBlank) {
                 out.put((byte) ((byte) (in.position() & 0xff) - 1));
 
                 System.out.println("token found: " + in.duplicate().position(prevIdx));
@@ -371,8 +431,8 @@ public enum HttpMethod {
         int last = 0;
         int b;
 
-        // start from 0 and traverese to null terminator inserted during the tokenization... 
-        while ((b = indexEntries.get()) != 0 && (indexEntries.position() <= margin)) last = b & 0xff;
+        // start from 0 and traverese to null terminator inserted during the tokenization...
+        while ((b = indexEntries.get()) != 0 && indexEntries.position() <= margin) last = b & 0xff;
 
         final int len = indexEntries.position();
 
@@ -382,9 +442,9 @@ public enum HttpMethod {
 
         while (!Character.isISOControl(b = indexEntries.get() & 0xff)
                 && !Character.isWhitespace(b)
-                && ('\n' != b)
-                && ('\r' != b)
-                && ('\t' != b)) ;
+                && '\n' != b
+                && '\r' != b
+                && '\t' != b) ;
 
         return decoder.decode((ByteBuffer) indexEntries.flip().position(margin));
 
@@ -461,7 +521,7 @@ public enum HttpMethod {
     final static CharsetDecoder decoder = charset.newDecoder();
 
 
-    public static ExecutorService threadPool= Executors.newCachedThreadPool() ;
+    public static ExecutorService threadPool = Executors.newCachedThreadPool();
     public static final int CHUNKDEFAULT = 4;
     public static final int CHUNK_NUM = 128;
     public static final int KBYTE = 1024;
@@ -475,7 +535,7 @@ public enum HttpMethod {
 
     static Reference<ByteBuffer> borrowBuffer(int... exp) {
 
-        final int slot = (exp.length == 0)
+        final int slot = exp.length == 0
                 ? DEFAULT_EXP
                 : exp[0];
 
@@ -556,4 +616,21 @@ public enum HttpMethod {
 
     private static int[] counter = new int[MAX_EXP];
 
+    private static class Rfc822Key implements Callable<Text> {
+        private final ByteBuffer src;
+        private int pos;
+
+        /**
+         * this assumes buffer beginning of line is marked!
+         */
+        public Rfc822Key(Pair<Integer, ByteBuffer> p) {
+            this.pos = (int) p.$1();
+            this.src = (ByteBuffer) ((ByteBuffer) p.$2()).duplicate().position(pos);
+        }
+
+        public Text call() throws Exception {
+            return Text.intern(UTF8.decode(src).toString());
+
+        }
+    }
 };
