@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Javid Jamae
  */
 public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> implements RadixTree<T> {
+//    private static final Iterable<Pair<Text,T>>[] EMPTYPAIRS = new Iterable<Pair<Text, T>>[]{};
 //
 //    private RadixTreeNode<T> $1;
 //
@@ -71,7 +72,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             }
         };
 
-        visit(key, visitor);
+        $(key, visitor);
 
         return (T) visitor.getResult();
     }
@@ -138,7 +139,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             }
         };
 
-        visit(key, visitor);
+        $(key, visitor);
 
         if ((Boolean) visitor.getResult()) {
 //            set$2(get$2() - 1);
@@ -154,7 +155,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
      * (non-Javadoc)
      * @see ds.tree.RadixTree#insert(java.lang.Text, java.lang.Object)
      */
-    public void insert(Text key, T value) throws DuplicateKeyException {
+    public RadixTree<T> insert(Text key, T value) throws DuplicateKeyException {
         try {
             insert(key, $1(), value);
         } catch (DuplicateKeyException e) {
@@ -163,6 +164,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         }
 //        set$2(get$2() + 1);
         $2().incrementAndGet();
+        return this;
     }
 
     /**
@@ -173,7 +175,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
      * @param value The value associated with the key
      * @throws DuplicateKeyException If the key already exists in the database.
      */
-    public void insert(Text key, RadixTreeNode<T> node, T value)
+    public RadixTree<T> insert(Text key, RadixTreeNode<T> node, T value)
             throws DuplicateKeyException {
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(key);
@@ -262,7 +264,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             }
         }
 
-
+        return this;
     }
 
     public ArrayList<T> searchPrefix(Text key, int recordLimit) {
@@ -274,13 +276,13 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             if (node.real) {
                 keys.add(node.value);
             }
-            getNodes(node, keys, recordLimit);
+            addAll(node, keys, recordLimit);
         }
 
         return keys;
     }
 
-    void getNodes(RadixTreeNode<T> parent, ArrayList<T> keys, int limit) {
+    RadixTreeImpl<T> addAll(RadixTreeNode<T> parent, ArrayList<T> keys, int limit) {
         Queue<RadixTreeNode<T>> queue = new LinkedList<RadixTreeNode<T>>();
 
         queue.addAll(parent.nodes);
@@ -297,6 +299,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
             queue.addAll(node.nodes);
         }
+        return this;
     }
 
     RadixTreeNode<T> searchPefix(Text key, RadixTreeNode<T> node) {
@@ -337,7 +340,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             }
         };
 
-        visit(key, visitor);
+        $(key, visitor);
 
         return (Boolean) visitor.getResult();
     }
@@ -348,11 +351,12 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
      * @param key     The key that need to be visited
      * @param visitor The visitor object
      */
-    public void visit(Text key, Visitor<T> visitor) {
+    public RadixTree<T> $(Text key, Visitor<T> visitor) {
         if ($1() == null) {
-            return;
+            return null;
         }
-        visit(key, visitor, null, $1());
+        $(key, visitor, null, $1());
+        return this;
     }
 
     /**
@@ -365,8 +369,8 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
      * @param parent
      * @param node    The Node from where onward to search
      */
-    void visit(Text prefix, Visitor<T> visitor,
-               RadixTreeNode<T> parent, RadixTreeNode<T> node) {
+    RadixTree<T> $(Text prefix, Visitor<T> visitor,
+                   RadixTreeNode<T> parent, RadixTreeNode<T> node) {
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(prefix);
 
@@ -384,12 +388,13 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
                 for (RadixTreeNode<T> child : node.nodes) {
                     // recursively search the child nodes
                     if (child.key.startsWith(newText.charAt(0) + "")) {
-                        visit(newText, visitor, node, child);
+                        $(newText, visitor, node, child);
                         break;
                     }
                 }
             }
         }
+        return this;
     }
 
 
@@ -398,12 +403,12 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
      * testing purpose only.
      */
     @Deprecated
-    public void display() {
-        display(0, $1());
+    public RadixTree<T> display() {
+        return display(0, $1());
     }
 
     @Deprecated
-    void display(int level, RadixTreeNode<T> node) {
+    RadixTreeImpl<T> display(int level, RadixTreeNode<T> node) {
         for (int i = 0; i < level; i++) {
             System.out.print(" ");
         }
@@ -421,14 +426,38 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         for (RadixTreeNode<T> child : node.nodes) {
             display(level + 1, child);
         }
+        return this;
     }
 
     public long getSize() {
         return $2().get();
     }
 
-    public void insert(String key, T value) {
-        insert(Text.intern(key), (T) value);
+    public RadixTree<T> insert(Pair<Text, T> textTPair) {
+    return  insert(textTPair.$1(),textTPair.$2());
+
     }
 
+    public RadixTree<T> insert(String key, T value) {
+        return insert(Text.intern(key), (T) value);
+
+    }
+
+    public RadixTree<T> insert(Pair<Text, T>... pair) {
+        for (Pair<Text, T> textTPair : pair)
+
+            insert(textTPair.$1(), textTPair.$2());
+
+        return this;
+    }
+
+    public RadixTree<T> insert(Iterable<Pair<Text, T>>... pair) {
+        ArrayList<Pair<Text, T>> x = new ArrayList<Pair<Text, T>>();
+
+        for (Iterable<Pair<Text, T>> pairIterable : pair)
+            for (Pair<Text, T> tPair : pairIterable)
+                x.add(tPair);
+
+        return insert((Pair<Text, T>[]) x.toArray());
+    }
 }

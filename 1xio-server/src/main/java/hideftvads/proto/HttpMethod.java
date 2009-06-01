@@ -1,7 +1,6 @@
 package hideftvads.proto;
 
 import static hideftvads.proto.HttpStatus.*;
-import hideftvads.server.Agent;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -78,8 +77,10 @@ public enum HttpMethod {
                         String x = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
                         final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n" + x + "Content-Length: " + fc.size()).append("\n\n").flip();
                         channel.write(UTF8.encode(c));
-                        key.interestOps(SelectionKey.OP_WRITE);
+
+
                         key.attach(new Object[]{this, xfer});
+                        key.interestOps(SelectionKey.OP_WRITE);
                     } catch (Exception e) {
                     } finally {
                         recycle(byteBufferReference, DEFAULT_EXP);
@@ -87,6 +88,7 @@ public enum HttpMethod {
                     return;
                 }
             } catch (Exception e) {
+                e.printStackTrace();
             }
             try {
                 response(key, $404);
@@ -105,7 +107,7 @@ public enum HttpMethod {
             public long chunk;
             private boolean pipeline = false;
 
-             void sendChunk(final SelectionKey key) {
+            void sendChunk(final SelectionKey key) {
                 if (!fc.isOpen() || !key.isValid() || !key.channel().isOpen()) {
                     return;
                 }
@@ -122,7 +124,7 @@ public enum HttpMethod {
 
                                     completion = System.currentTimeMillis();
                                     final double span = (double) completion - creation / 1000.0;
-                                    final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName()+ '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + (fc.size() / span) + ' ' + "chunkavg " + (fc.size() / chunk);
+                                    final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName() + '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + (fc.size() / span) + ' ' + "chunkavg " + (fc.size() / chunk);
                                     System.err.println(s);
                                     try {
                                         fc.close();
@@ -158,12 +160,12 @@ public enum HttpMethod {
                         return null;
                     }
                 };
-                 try {
-                     callable.call();
-                 } catch (Exception ignored) {
+                try {
+                    callable.call();
+                } catch (Exception ignored) {
 
-                 }
-             }
+                }
+            }
 
 
             public Xfer(FileChannel fc, CharSequence name) {
@@ -194,11 +196,12 @@ public enum HttpMethod {
         public void onAccept(SelectionKey selectionKey) {
             if (selectionKey.isAcceptable()) {
                 SocketChannel client = null;
-                SelectionKey clientkey = null;
 
                 try {
-                    client = Agent.serverSocketChannel.accept();
-                    client.configureBlocking(false).register(Agent.selector, SelectionKey.OP_READ);
+                    final ServerSocketChannel socketChannel = (ServerSocketChannel) selectionKey.channel();
+
+                    client = socketChannel.accept();
+                    client.configureBlocking(false).register(selectionKey.selector() , SelectionKey.OP_READ);
                 } catch (IOException e) {
 
                     e.printStackTrace();
@@ -292,15 +295,15 @@ public enum HttpMethod {
         }
 
     },;
+
+
     private static final int DEFAULT_EXP = 0;
-
-
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
 
 
     final int margin = name().length() + 1;
     static final Charset UTF8 = Charset.forName("UTF8");
-
+ 
 
     /**
      * deduce a few parse optimizations
@@ -458,34 +461,12 @@ public enum HttpMethod {
     final static CharsetDecoder decoder = charset.newDecoder();
 
 
-    private static ExecutorService threadPool;
+    public static ExecutorService threadPool= Executors.newCachedThreadPool() ;
     public static final int CHUNKDEFAULT = 4;
     public static final int CHUNK_NUM = 128;
     public static final int KBYTE = 1024;
     private static final int MAX_EXP = 16;
 
-
-    static {
-        try {
-            Agent.selector = Selector.open();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-
-        threadPool = Executors.newCachedThreadPool();
-
-        HttpMethod.threadPool.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Agent.init();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-    }
 
     public void onAccept(SelectionKey key) {
         throw new UnsupportedOperationException();
@@ -575,7 +556,4 @@ public enum HttpMethod {
 
     private static int[] counter = new int[MAX_EXP];
 
-    public static void setPort(int port) {
-        Agent.port = port;
-    }
 };

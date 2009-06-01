@@ -38,7 +38,7 @@ import javolution.text.Text;
  */
 public interface Visitor<T> {
     /**
-     * This method gets called by {@link RadixTreeImpl#visit(Text, Visitor) visit}
+     * This method gets called by {@link RadixTreeImpl#$(Text, Visitor) visit}
      * when it finds a node matching the key given to it.
      * 
      * @param key The key that matched the node
