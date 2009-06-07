@@ -22,7 +22,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-*/
+*/                                                                    
 
 package ds.tree;
 
@@ -40,8 +40,7 @@ import java.util.concurrent.atomic.*;
  * @author Javid Jamae
  */
 public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> implements RadixTree<T> {
-
-
+ 
     /**
      * Create a Radix Tree with only the default node root.
      */
@@ -52,13 +51,13 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
     }
 
     @SuppressWarnings("unchecked")
-    public T find(Text key) {
-        Visitor<T> visitor = new Visitor<T>() {
+    public T find(final Text key) {
+        final Visitor<T> visitor = new Visitor<T>() {
 
             T result = null;
 
-            public void visit(Text key, RadixTreeNode<T> parent,
-                              RadixTreeNode<T> node) {
+            public void visit(final Text key, final RadixTreeNode<T> parent,
+                              final RadixTreeNode<T> node) {
                 if (node.real)
                     result = node.value;
             }
@@ -73,12 +72,12 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         return (T) visitor.getResult();
     }
 
-    public boolean delete(Text key) {
-        Visitor<T> visitor = new Visitor<T>() {
+    public boolean delete(final Text key) {
+        final Visitor<T> visitor = new Visitor<T>() {
             boolean delete = false;
 
-            public void visit(Text key, RadixTreeNode<T> parent,
-                              RadixTreeNode<T> node) {
+            public void visit(final Text key, final RadixTreeNode<T> parent,
+                              final RadixTreeNode<T> node) {
                 delete = node.real;
 
                 // if it is a real node
@@ -87,7 +86,8 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
                     // delete it from the its parent children list
                     if (node.nodes.size() == 0) {
                         final List<RadixTreeNode<T>> childern = parent.nodes;
-                        Iterator<RadixTreeNode<T>> it = childern.iterator();
+                        Iterator<RadixTreeNode<T>> it
+                                = childern.iterator();
 
                         while (it.hasNext()) {
                             if (it.next().key.equals(node.key)) {
@@ -147,9 +147,6 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         return (Boolean) visitor.getResult();
     }
 
-    private static Text plus(RadixTreeNode parent, RadixTreeNode child) {
-        return parent.key.plus(child.key);
-    }
 
     /*
      * (non-Javadoc)
@@ -184,11 +181,11 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
         // we are either at the $1 node
         // or we need to go down the tree
-        if (!node.key.isBlank()
+        if (!isEmpty(node)
                 && numberOfMatchingCharacters != 0
-                && (numberOfMatchingCharacters >= key.length()
-                || numberOfMatchingCharacters < node.key.length())) {
-            if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters == node.key.length()) {
+                && (numberOfMatchingCharacters >= length(key)
+                || numberOfMatchingCharacters < length(node.key))) {
+            if (numberOfMatchingCharacters == length(key) && numberOfMatchingCharacters == length(node.key)) {
 
                 if (node.real) {
                     throw new DuplicateKeyException(
@@ -202,19 +199,19 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             // is a prefix of the current node key
             else {
                 if (numberOfMatchingCharacters > 0
-                        && numberOfMatchingCharacters < node.key.length()) {
+                        && numberOfMatchingCharacters < length(node.key)) {
                     RadixTreeNode<T> n1 = new RadixTreeNode<T>();
                     n1.key = slice(node.key, numberOfMatchingCharacters);
                     n1.real = node.real;
                     n1.value = node.value;
                     n1.nodes = node.nodes;
 
-                    node.key = key.subtext(0, numberOfMatchingCharacters);
+                    node.key = subString(key, numberOfMatchingCharacters);
                     node.real = false;
                     node.nodes = new ArrayList<RadixTreeNode<T>>();
                     node.nodes.add(n1);
 
-                    if (numberOfMatchingCharacters >= key.length()) {
+                    if (numberOfMatchingCharacters >= length(key)) {
                         node.value = value;
                         node.real = true;
                     } else {
@@ -249,7 +246,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             boolean flag = false;
             Text newText = slice(key, numberOfMatchingCharacters);
             for (RadixTreeNode<T> child : node.nodes) {
-                if (child.key.startsWith(newText.charAt(0) + "")) {
+                if (startsWith(newText, child)) {
                     flag = true;
                     insert(newText, child, value);
                     break;
@@ -270,9 +267,6 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         return this;
     }
 
-    private static Text slice(Text key, int numberOfMatchingCharacters) {
-        return key.subtext(numberOfMatchingCharacters, key.length());
-    }
 
     public ArrayList<T> searchPrefix(Text key, int recordLimit) {
         ArrayList<T> keys = new ArrayList<T>();
@@ -314,15 +308,15 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(key);
 
-        if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters <= node.key.length()) {
+        if (numberOfMatchingCharacters == length(key) && numberOfMatchingCharacters <= length(node.key)) {
             result = node;
         } else {
-            if (node.key.isBlank()
-                    || numberOfMatchingCharacters < key.length()
-                    && numberOfMatchingCharacters >= node.key.length()) {
+            if (isEmpty(node)
+                    || numberOfMatchingCharacters < length(key)
+                    && numberOfMatchingCharacters >= length(node.key)) {
                 Text newText = slice(key, numberOfMatchingCharacters);
                 for (RadixTreeNode<T> child : node.nodes) {
-                    if (child.key.startsWith(newText.charAt(0) + "")) {
+                    if (startsWith(newText, child)) {
                         result = searchPefix(newText, child);
                         break;
                     }
@@ -376,25 +370,25 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
      * @param parent
      * @param node    The Node from where onward to search
      */
-    RadixTree<T> $(Text prefix, Visitor<T> visitor,
-                   RadixTreeNode<T> parent, RadixTreeNode<T> node) {
+    RadixTree<T> $(final Text prefix, final Visitor<T> visitor,
+                   final RadixTreeNode<T> parent, final RadixTreeNode<T> node) {
 
         int numberOfMatchingCharacters = node.getNumberOfMatchingCharacters(prefix);
 
         // if the node key and prefix match, we found a match!
-        if (numberOfMatchingCharacters == prefix.length() && numberOfMatchingCharacters == node.key.length()) {
+        if (numberOfMatchingCharacters == length(prefix) && numberOfMatchingCharacters == length(node.key)) {
             visitor.visit(prefix, parent, node);
         } else {
-            if (node.key.isBlank()// either we are at the
+            if (isEmpty(node)// either we are at the
                     // $1
-                    || numberOfMatchingCharacters < prefix.length()
-                    && numberOfMatchingCharacters >= node.key.length()) {
+                    || numberOfMatchingCharacters < length(prefix)
+                    && numberOfMatchingCharacters >= length(node.key)) {
                 // OR we need to
                 // traverse the nodes
-                Text newText = slice(prefix, numberOfMatchingCharacters);
-                for (RadixTreeNode<T> child : node.nodes) {
+                final Text newText = slice(prefix, numberOfMatchingCharacters);
+                for ( final RadixTreeNode<T> child : node.nodes) {
                     // recursively search the child nodes
-                    if (child.key.startsWith(newText.charAt(0) + "")) {
+                    if (startsWith(newText, child)) {
                         $(newText, visitor, node, child);
                         break;
                     }
@@ -446,7 +440,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
     }
 
     public RadixTree<T> insert(String key, T value) {
-        return insert(Text.intern(key), (T) value);
+        return insert(Text.intern(key), value);
 
     }
 
@@ -465,6 +459,28 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             for (Pair<Text, T> tPair : pairIterable)
                 x.add(tPair);
 
-        return insert((Pair<Text, T>[]) x.toArray());
+        return insert((Pair<Text, T>[]) x.toArray   ());
+    }                                                     
+    private static Text plus(final RadixTreeNode  parent, final RadixTreeNode  child) {
+        return parent.key.plus(child.key);
     }
+    private static Text subString(final Text key, final int numberOfMatchingCharacters) {
+        return key.subtext(0, numberOfMatchingCharacters);
+    }
+
+    private static Text slice(final Text key, final int numberOfMatchingCharacters) {
+        return key.subtext(numberOfMatchingCharacters, length(key));
+    }
+    private static boolean isEmpty(final RadixTreeNode node) {
+        return node.key.isBlank();
+    }
+
+    private static int length(final Text prefix) {
+        return prefix.length();
+    }
+
+    private static boolean startsWith(final Text newText, final RadixTreeNode  child) {
+        return child.key.startsWith(newText.charAt(0) + "");
+    }
+
 }

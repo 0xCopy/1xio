@@ -65,7 +65,7 @@ public enum HttpMethod {
                     final String query = uri.getQuery();
                     final String fragment = uri.getFragment();
 
-                    MethodExtract methodExtract = new MethodExtract(o, path, query, fragment).invoke();
+                    final MethodExtract methodExtract = new MethodExtract(o, path, query, fragment).invoke();
                     Text r = methodExtract.getR();
 
                     System.err.println(":::"+r);
@@ -130,7 +130,12 @@ public enum HttpMethod {
 
                 } else {
                     try {
-                        final RandomAccessFile fnode = new RandomAccessFile(path.toString(), "r");
+
+                        String name1 = path.toString();
+                        if(name1.charAt(0)=='/')name1=name1.substring(1);
+                        name1.replaceAll("/..","/.");
+                        
+                        final RandomAccessFile fnode = new RandomAccessFile(name1, "r");
 
                         if (fnode.getFD().valid()) {
                             final FileChannel fc = fnode.getChannel();
