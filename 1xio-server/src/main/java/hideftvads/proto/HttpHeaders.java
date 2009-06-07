@@ -25,6 +25,7 @@ public enum HttpHeaders {
         final int i = buffer.position();
         if ((buffer.get(tokenLen + i) & 0xff) == ':') {
             int j;
+            
             for (j = 0; j < tokenLen && token.get(j) == buffer.get(i + j); j++) ;
             return tokenLen == j;
         }

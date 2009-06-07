@@ -158,20 +158,19 @@ public enum HttpMethod {
                             }
                             return;
                         }
-                    } catch (Exception
-                            e) {
-                        e.printStackTrace();
+                    } catch (Exception  e) {
+//                        e.printStackTrace();
                     }
                 }
                 try {
                     response(key, $404);
                     key.cancel();
                 } catch (IOException e) {
-                    e.printStackTrace();
+//                    e.printStackTrace();
                 }
             } catch (DuplicateKeyException ignored) {
             } catch (IOException e) {
-                e.printStackTrace();  //TODO: verify for a purpose
+//                e.printStackTrace();  //TODO: verify for a purpose
             }
 
         }
@@ -190,7 +189,8 @@ public enum HttpMethod {
                     return;
                 }
                 final SocketChannel[] channel = new SocketChannel[]{null};
-                Callable<Object> callable = new Callable<Object>() {
+                final Callable<Object> 
+                        callable = new Callable<Object>() {
                     public Object call() throws Exception {
 //                        Context.enter(LogContext.class);
                         try {

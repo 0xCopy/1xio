@@ -26,11 +26,11 @@ THE SOFTWARE.
 
 package ds.tree;
 
-import alg.Pair;
-import javolution.text.Text;
+import alg.*;
+import javolution.text.*;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.*;
 
 
 /**
@@ -40,11 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Javid Jamae
  */
 public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> implements RadixTree<T> {
-//    private static final Iterable<Pair<Text,T>>[] EMPTYPAIRS = new Iterable<Pair<Text, T>>[]{};
-//
-//    private RadixTreeNode<T> $1;
-//
-//    private AtomicLong $2;
+
 
     /**
      * Create a Radix Tree with only the default node root.
@@ -128,7 +124,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
              */
             void mergeNodes(RadixTreeNode<T> parent,
                             RadixTreeNode<T> child) {
-                parent.key = parent.key.plus(child.key);
+                parent.key = plus(parent, child);
                 parent.real = child.real;
                 parent.value = child.value;
                 parent.nodes = child.nodes;
@@ -151,6 +147,10 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         return (Boolean) visitor.getResult();
     }
 
+    private static Text plus(RadixTreeNode parent, RadixTreeNode child) {
+        return parent.key.plus(child.key);
+    }
+
     /*
      * (non-Javadoc)
      * @see ds.tree.RadixTree#insert(java.lang.Text, java.lang.Object)
@@ -160,7 +160,9 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             insert(key, $1(), value);
         } catch (DuplicateKeyException e) {
             // re-throw the exception with 'key' in the message
-            throw new DuplicateKeyException(Text.intern("Duplicate key: '").plus(key).plus("'"));
+            throw new DuplicateKeyException(
+                    ("Duplicate key: '" + key +
+                            "'"));
         }
 //        set$2(get$2() + 1);
         $2().incrementAndGet();
@@ -189,7 +191,8 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             if (numberOfMatchingCharacters == key.length() && numberOfMatchingCharacters == node.key.length()) {
 
                 if (node.real) {
-                    throw new DuplicateKeyException(Text.intern("Duplicate key"));
+                    throw new DuplicateKeyException(
+                            ("Duplicate key"));
                 } else {
                     node.real = value != null;
                     node.value = value;
@@ -201,7 +204,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
                 if (numberOfMatchingCharacters > 0
                         && numberOfMatchingCharacters < node.key.length()) {
                     RadixTreeNode<T> n1 = new RadixTreeNode<T>();
-                    n1.key = node.key.subtext(numberOfMatchingCharacters, node.key.length());
+                    n1.key = slice(node.key, numberOfMatchingCharacters);
                     n1.real = node.real;
                     n1.value = node.value;
                     n1.nodes = node.nodes;
@@ -216,7 +219,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
                         node.real = true;
                     } else {
                         RadixTreeNode<T> n2 = new RadixTreeNode<T>();
-                        n2.key = key.subtext(numberOfMatchingCharacters, key.length());
+                        n2.key = slice(key, numberOfMatchingCharacters);
                         n2.real = true;
                         n2.value = value;
                         node.nodes.add(n2);
@@ -225,7 +228,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
                 // this key need to be added as the child of the current node
                 else {
                     RadixTreeNode<T> n = new RadixTreeNode<T>();
-                    n.key = node.key.subtext(numberOfMatchingCharacters, node.key.length());
+                    n.key = slice(node.key, numberOfMatchingCharacters);
                     n.nodes = node.nodes;
                     n.real = node.real;
                     n.value = node.value;
@@ -244,7 +247,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         // there is a exact match just make the current node as data node
         else {
             boolean flag = false;
-            Text newText = key.subtext(numberOfMatchingCharacters, key.length());
+            Text newText = slice(key, numberOfMatchingCharacters);
             for (RadixTreeNode<T> child : node.nodes) {
                 if (child.key.startsWith(newText.charAt(0) + "")) {
                     flag = true;
@@ -265,6 +268,10 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
         }
 
         return this;
+    }
+
+    private static Text slice(Text key, int numberOfMatchingCharacters) {
+        return key.subtext(numberOfMatchingCharacters, key.length());
     }
 
     public ArrayList<T> searchPrefix(Text key, int recordLimit) {
@@ -313,7 +320,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
             if (node.key.isBlank()
                     || numberOfMatchingCharacters < key.length()
                     && numberOfMatchingCharacters >= node.key.length()) {
-                Text newText = key.subtext(numberOfMatchingCharacters, key.length());
+                Text newText = slice(key, numberOfMatchingCharacters);
                 for (RadixTreeNode<T> child : node.nodes) {
                     if (child.key.startsWith(newText.charAt(0) + "")) {
                         result = searchPefix(newText, child);
@@ -384,7 +391,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
                     && numberOfMatchingCharacters >= node.key.length()) {
                 // OR we need to
                 // traverse the nodes
-                Text newText = prefix.subtext(numberOfMatchingCharacters, prefix.length());
+                Text newText = slice(prefix, numberOfMatchingCharacters);
                 for (RadixTreeNode<T> child : node.nodes) {
                     // recursively search the child nodes
                     if (child.key.startsWith(newText.charAt(0) + "")) {
@@ -434,7 +441,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
     }
 
     public RadixTree<T> insert(Pair<Text, T> textTPair) {
-    return  insert(textTPair.$1(),textTPair.$2());
+        return insert(textTPair.$1(), textTPair.$2());
 
     }
 
