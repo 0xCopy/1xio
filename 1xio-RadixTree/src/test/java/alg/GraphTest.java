@@ -5,6 +5,7 @@ import junit.framework.*;
 
 import java.nio.*;
 import java.nio.charset.*;
+import java.io.*;
 
 /**
  * User: jim
@@ -32,51 +33,83 @@ public class GraphTest extends TestCase {
 
     public void testCreate() {
         final Graph graph = new Graph(SRC);
-
-
         graph.create();
-
-    }
-//
-//    public void testPrint() {
-//
-//
-//        Graph graph;
-//
-//
-//        graph = new Graph(UTF8.encode("apple app a"));
-//
-//
-//        z(graph);
-//
-//        graph = new Graph(UTF8.encode("apple a app"));
-//
-//
-//        z(graph);
-//
-//        graph = new Graph(UTF8.encode("apple app"));
-//
-//
-//        z(graph);
-//
-//    }
+    } 
 
     public void testSingular() {
-        Graph graph = new Graph(UTF8.encode("a"));
+        final Graph graph = new Graph(UTF8.encode("a"));
         z(graph);
 
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
+        assertEquals(1, aNode.len); 
+
+    }
+
+          
+
+    public void testSiblings() {
+        final Graph graph = new Graph(UTF8.encode("a b"));
+        z(graph);
+        assertEquals(2, graph.root.nodes.size());
+
+        GraphNode aNode = graph.root.nodes.get(0);
+        assertEquals(0, aNode.pos);
+        assertEquals(1, aNode.len);
+        assertEquals("a", graph.reify(graph.root.nodes.get(0)));
+
+        aNode = graph.root.nodes.get(1);
+        assertEquals(2, aNode.pos);
+        assertEquals(1, aNode.len);
+        assertEquals("b", graph.reify(graph.root.nodes.get(1)));
+
+
+    }
+
+
+    public void testJuxtaposedSiblings() {
+        final Graph graph = new Graph(UTF8.encode("b a"));
+        z(graph);
+        assertEquals(2, graph.root.nodes.size());
+
+        GraphNode aNode = graph.root.nodes.get(0);
+        assertEquals(2, aNode.pos);
+        assertEquals(1, aNode.len);
+        assertEquals("a", graph.reify(graph.root.nodes.get(0)));
+
+
+        aNode = graph.root.nodes.get(1);
+        assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
 
+        assertEquals("b", graph.reify(graph.root.nodes.get(1)));
+    }
 
+
+    public void testChildAdd() {
+        final Graph graph = new Graph(UTF8.encode("a aa"));
+        z(graph);
+        assertEquals(2, graph.root.nodes.size());
+
+        GraphNode aNode = graph.root.nodes.get(0);
+        assertEquals(2, aNode.pos);
+        assertEquals(1, aNode.len);
+        assertEquals("a", graph.reify(graph.root.nodes.get(0)));
+
+
+        aNode = aNode.get(0);
+        assertEquals(0, aNode.pos);
+        assertEquals(1, aNode.len);
+
+        assertEquals("b", graph.reify(graph.root.nodes.get(1)));
     }
 
 
     public void testOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a anvil apples"));
         z(graph);
+
 
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
@@ -115,7 +148,7 @@ public class GraphTest extends TestCase {
         final GraphNode ppleNode = aNode.nodes.get(1);
         assertEquals(10, ppleNode.pos);
         assertEquals(5, ppleNode.len);
-        
+
     }
 
     public void testOrderedHierarchy() {
@@ -144,6 +177,13 @@ public class GraphTest extends TestCase {
     private void z(Graph graph) {
         graph.create();
         System.err.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
-        X_STREAM.toXML(graph, System.err);
+
+        final Object[] objects = graph.root.nodes.toArray();
+
+        try {
+            graph.render(0,System.out,graph.root);
+        } catch (IOException e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
     }
 }

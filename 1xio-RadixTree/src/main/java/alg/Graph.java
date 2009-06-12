@@ -2,174 +2,178 @@ package alg;
 
 import java.io.*;
 import java.nio.*;
+import java.nio.charset.*;
 import java.util.*;
-
-//
-//enum GraphNode {
-//    pos(4),
-//    len(4),
-//
-//    type(1),
-//    count(1),;
-//    static int position;
-//    private final int size;
-//    private final int offset;
-//
-//
-//    GraphNode(int size) {
-//
-//        //To change body of created methods use File | Settings | File Templates.
-//        this.size = size;
-//        offset = init(size);
-//    }
-//
-//    private int init(int size) {
-//        int offset = position;
-//        position += size;
-//        return offset;
-//    }
-//}
-//
+import java.util.concurrent.*;
 
 
 /**
+ * this is a key graph of src ByteBuffer input token indexes.  the Node is a Triple {position,length,type} pointing to the graph (todo: remove the graph reference from graph node;.
+ * <p/>
  * User: jim
  * Date: Jun 7, 2009
  * Time: 9:17:33 PM
  */
 public class Graph {
-    final
-    ByteBuffer src;
-    public ByteBuffer indexBuffer;
-    RandomAccessFile indexFile;
-    private static final byte TYPE_DATA = 1;
-    GraphNode root = new GraphNode(this);
+    final ByteBuffer src;
+
+
+    static final byte TYPE_DATA = 1;
+    GraphNode root = new GraphNode();
     private static final int MINA = (int) 'a' <= (int) 'A' ? (int) 'a' : (int) 'A';
-//    private
-//    GraphNode root;
+    private static final Charset UTF8 = Charset.forName("UTF8");
+    private static final Charset CHARSET = UTF8;
+    private static final ByteBuffer EOL = UTF8.encode(",");
+    public final Comparator<GraphNode> comparator;
 
 
     public Graph(final ByteBuffer src) {
         this.src = src;
         root.nodes = new ArrayList<GraphNode>();
-        //            final File tempFile = createTempFile("AAA", "XXX");
-//            indexFile = new RandomAccessFile(tempFile.getAbsolutePath(), "rwc");
-//
-//            indexFile.setLength(8 << 23);
-//            indexBuffer = indexFile.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 8 << 23);
-
+        comparator = new GraphComparator();
     }
 
 
+    /**
+     * this is a lazy creation indexer of input bytes.
+     * <p/>
+     * nodes are added to the tree on the basis of thier first byte,
+     * and worst case tree is a trie structure.  as we parse each byte of the input token, we prolong its length,
+     * we end it, or we move a prospective parent into the cursor sites.
+     * <p/>
+     * nodes are stored in sorted arrays based on indirect bytes described by (pos,len) pairs.
+     */
     public void create() {
         final ByteBuffer src = this.src.duplicate();
         newNode:
         while (src.hasRemaining()) {
 
-            final int p = src.position();
+            GraphNode insertionCursor = root;
+            final GraphNode progress = new GraphNode(src.position(), 0, TYPE_DATA/*, this*/);
 
-            GraphNode loft = root;
-            final GraphNode progress = new GraphNode(p, 0, TYPE_DATA, this);
-
-//            int l = 0;
-            byte loftByte, inputByte = 0;
+            //grab token.
+            byte inByte = 0;
             while (src.hasRemaining()) {
 
-                /**
-                 * on token break...
-                 */
-                int l;
-                try {
-                    if (((inputByte = src.get()) & 0xff) < MINA) {
-                        continue newNode;
+                boolean overflow = false;
+                boolean isWhite = false;
+                boolean mustBifurcate = false;
+                byte loftByte = -1;
+
+                while (src.hasRemaining()
+                        && !(isWhite = ((inByte = src.get()) < MINA)) //else token end checked here
+                        && !(overflow = (insertionCursor != null  && ++progress.len > insertionCursor.len&& progress != insertionCursor))//overflow checked before read
+                        && (mustBifurcate = progress
+                        != insertionCursor
+                        && (inByte
+                        != (loftByte
+                        = src.get(insertionCursor.pos + (progress.len))
+                ))
+                )
+                        ) {
+                    progress.len++;
+                }
+
+
+                if (isWhite) break;
+
+                if (overflow) {
+
+                    progress.pos += insertionCursor.len;
+                    progress.len -= insertionCursor.len;
+
+                    if (insertionCursor.nodes == null || insertionCursor.nodes.isEmpty()) {
+                        insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
                     } else {
-                        l = p - src.position();
-                        ++progress.len;
-                    }
-                } catch (Throwable e) {
+                        final GraphNode[] graphNodes = insertionCursor.nodes.toArray(new GraphNode[0]);
 
-                    System.err.println("create complete.");
-                    return;
-                }
+                        int ix = Arrays.binarySearch(graphNodes, progress, comparator);
 
-
-                if (loft.len >= l) {
-                    GraphNode sel = null;
-                    for (final GraphNode node : loft.nodes) {
-                        if (src.get(node.pos) > inputByte)//our new loft node
-                        {
-                            break;
+                        if (ix >= 0) {
+                        
+                         
                         } else {
-                            if (src.get(node.pos) == inputByte) {
-                                sel = node;
-                                break;
-                            }
+                            ix = -ix - 1;
+                            
+                            insertionCursor.nodes.add(ix, progress);
                         }
+                        GraphNode olderNode = insertionCursor.get(ix);
 
-                    }
-                    if (sel == null) {     // no suitable parent was located 
+                        //if first byte of both nodes same
+                        if (src.get(olderNode.pos) == src.get(progress.pos)) {
 
-                        loft.nodes.add(progress);
+                            //cursor moves to olderNode 
+                            insertionCursor = olderNode;
 
-                        while (src.hasRemaining() && src.get() > ' ') {
-                            progress.len++;
+                        } else {
+                            add(progress, insertionCursor);
+                            insertionCursor = progress;// 
                         }
-                        continue newNode;
-
-                    } else {     //sel was found, so we now begin descending into sel as loft.
-                        loft = sel;
-                        progress.pos++;
-                        progress.len = 0;
-            l=0;
                     }
+
+                } else if (!mustBifurcate) {
+
+
                 }
 
-                try {
-                    final byte b = src.get(loft.pos + l);
-                    if (inputByte != b) {
-                        if (inputByte < b) {              //bifurcate fun fun fun!
-                            new GraphNode(loft, l, progress);//implicit merge on this ctor.
-
-
-                            while (src.hasRemaining() && src.get() > ' ') {
-                                progress.len++;
-                            }
-                            continue newNode;
-                        }
-
-                    }
-                    progress.pos++;
-                } catch (Exception e) {
-//                    e.printStackTrace();  //TODO: Verify for a purpose
-                }
             }
         }
     }
 
-    private void put(final GraphNode root, final GraphNode n) {
-        if (root.len == n.len) {
-            //if match assert type+data even if not previously.
-            final int i = root.compareTo(n);
-            if (i == 0) {
-                root.type = TYPE_DATA;
-                return;
-            }
-        }
-        int splitPoint = 0;
-        byte b1;
-        byte b2;
-        final int biggestOverlap = Math.min(n.len, root.len);
-        while ((splitPoint < biggestOverlap) && ((b1 = src.get(root.pos + splitPoint)) == (b2 = src.get(n.pos + splitPoint))))
-            ++splitPoint;
+    String reify(final GraphNode progress) {
+        final CharBuffer buffer = CHARSET.decode((ByteBuffer) src.duplicate().limit(progress.pos + progress.len).position(progress.pos));
+        return buffer.toString();
+    }
 
-        if (splitPoint < biggestOverlap)//bifurcate, typical
-        {
-            final GraphNode synth = new GraphNode(root, splitPoint, n);
+
+
+
+    void render(int depth, PrintStream c, GraphNode n) throws IOException {
+        c.print('\n');
+
+        for (int i = 0; i < depth; i++) {
+            c.write(' ');
+        }
+        c.print(n.toString());
+        if (n.type != 0) {
+            c.write(':');
+            c.print(reify(n));
+        }
+
+if(n.nodes!=null)        for (GraphNode node : n.nodes) {
+            render(depth + 1, c, node);
+        }
+    }
+
+
+    public void add(final GraphNode progress, GraphNode parent) {
+        if (parent.nodes == null || parent.nodes.isEmpty()) {
+            parent.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
         } else {
-            final GraphNode graphNode = new GraphNode(n);
-            graphNode.len -= splitPoint;
-            graphNode.pos += splitPoint;
-            root.nodes.add(graphNode);
+            parent.nodes.add(progress);
+            Arrays.sort(parent.nodes.toArray(), (Comparator) comparator);
         }
     }
+
+    /**
+     * User: jim
+     * Date: Jun 11, 2009
+     * Time: 4:56:00 PM
+     */
+    class GraphComparator implements Comparator<GraphNode> {
+
+        public int compare(GraphNode o1, GraphNode o2) {
+
+            int l = 0;
+            int c;
+            final int i = Math.min(o1.len, o2.len);
+            while ((0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
+                l++;
+                if (l > i)
+                    return o2.len - o1.len;
+            }
+            return c;
+        }
+    }
+
 }
