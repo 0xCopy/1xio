@@ -3,9 +3,8 @@ package alg;
 import com.thoughtworks.xstream.*;
 import junit.framework.*;
 
-import java.nio.*;
-import java.nio.charset.*;
 import java.io.*;
+import java.nio.charset.*;
 
 /**
  * User: jim
@@ -14,16 +13,14 @@ import java.io.*;
  */
 public class GraphTest extends TestCase {
 
-    private static final String C = "apple app anvil a";
     private static final Charset UTF8 = Charset.forName("UTF8");
-    private static final ByteBuffer SRC = UTF8.encode(C);
     private static final XStream X_STREAM = new XStream();
 
 
     public void setUp() {
 
 
-        SRC.rewind();
+        UTF8.encode("apple app anvil a").rewind();
 
     }
 
@@ -32,9 +29,9 @@ public class GraphTest extends TestCase {
     }
 
     public void testCreate() {
-        final Graph graph = new Graph(SRC);
+        final Graph graph = new Graph(UTF8.encode("apple app anvil a"));
         graph.create();
-    } 
+    }
 
     public void testSingular() {
         final Graph graph = new Graph(UTF8.encode("a"));
@@ -43,11 +40,10 @@ public class GraphTest extends TestCase {
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
-        assertEquals(1, aNode.len); 
+        assertEquals(1, aNode.len);
 
     }
 
-          
 
     public void testSiblings() {
         final Graph graph = new Graph(UTF8.encode("a b"));
@@ -90,19 +86,19 @@ public class GraphTest extends TestCase {
     public void testChildAdd() {
         final Graph graph = new Graph(UTF8.encode("a aa"));
         z(graph);
-        assertEquals(2, graph.root.nodes.size());
+        assertEquals(1, graph.root.nodes.size());
 
         GraphNode aNode = graph.root.nodes.get(0);
-        assertEquals(2, aNode.pos);
+        assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
         assertEquals("a", graph.reify(graph.root.nodes.get(0)));
 
 
         aNode = aNode.get(0);
-        assertEquals(0, aNode.pos);
+        assertEquals(3, aNode.pos);
         assertEquals(1, aNode.len);
 
-        assertEquals("b", graph.reify(graph.root.nodes.get(1)));
+        assertEquals("a", graph.reify(aNode ));
     }
 
 
@@ -181,7 +177,7 @@ public class GraphTest extends TestCase {
         final Object[] objects = graph.root.nodes.toArray();
 
         try {
-            graph.render(0,System.out,graph.root);
+            graph.render(0, System.err, graph.root);
         } catch (IOException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         }

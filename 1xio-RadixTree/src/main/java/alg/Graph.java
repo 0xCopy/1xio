@@ -61,71 +61,101 @@ public class Graph {
                 byte loftByte = -1;
 
                 while (src.hasRemaining()
-                        && !(isWhite = ((inByte = src.get()) < MINA)) //else token end checked here
-                        && !(overflow = (insertionCursor != null  && ++progress.len > insertionCursor.len&& progress != insertionCursor))//overflow checked before read
-                        && (mustBifurcate = progress
-                        != insertionCursor
-                        && (inByte
-                        != (loftByte
-                        = src.get(insertionCursor.pos + (progress.len))
-                ))
-                )
-                        ) {
-                    progress.len++;
+                        && !(isWhite = ((inByte = src.get()) < MINA))
+                        && !(
+                        overflow = (insertionCursor != null
+                                && progress.len > insertionCursor.len
+                        ))
+                        && (mustBifurcate = !src.hasRemaining() || progress != insertionCursor
+                        && (inByte != (loftByte = src.get(insertionCursor.pos + (progress.len)))
+                ))) {
+                    progress.len = src.position() - progress.pos;
                 }
 
 
                 if (isWhite) break;
 
-                if (overflow) {
+                if (src.hasRemaining()) progress.len = src.position() - progress.pos;
 
-                    progress.pos += insertionCursor.len;
-                    progress.len -= insertionCursor.len;
-
-                    if (insertionCursor.nodes == null || insertionCursor.nodes.isEmpty()) {
-                        insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
-                    } else {
-                        final GraphNode[] graphNodes = insertionCursor.nodes.toArray(new GraphNode[0]);
-
-                        int ix = Arrays.binarySearch(graphNodes, progress, comparator);
-
-                        if (ix >= 0) {
-                        
-                         
-                        } else {
-                            ix = -ix - 1;
-                            
-                            insertionCursor.nodes.add(ix, progress);
-                        }
-                        GraphNode olderNode = insertionCursor.get(ix);
-
-                        //if first byte of both nodes same
-                        if (src.get(olderNode.pos) == src.get(progress.pos)) {
-
-                            //cursor moves to olderNode 
-                            insertionCursor = olderNode;
-
-                        } else {
-                            add(progress, insertionCursor);
-                            insertionCursor = progress;// 
-                        }
-                    }
-
-                } else if (!mustBifurcate) {
-
-
-                }
+                if (overflow || (insertionCursor != null
+                        && progress.len > insertionCursor.len
+                ))
+                    insertionCursor = handleOverflow(src, insertionCursor, progress);
+                else if (mustBifurcate)
+                    insertionCursor = handleBifurcate(insertionCursor, progress);
 
             }
         }
     }
 
-    String reify(final GraphNode progress) {
-        final CharBuffer buffer = CHARSET.decode((ByteBuffer) src.duplicate().limit(progress.pos + progress.len).position(progress.pos));
-        return buffer.toString();
+    GraphNode handleBifurcate(GraphNode insertionCursor, GraphNode progress) {
+
+
+        int splitPoint = progress.len;
+
+        progress.pos = insertionCursor.pos + splitPoint;
+        progress.len = insertionCursor.len - splitPoint;
+
+        insertionCursor.len = progress.pos - insertionCursor.pos;
+
+        progress.nodes = insertionCursor.nodes;
+        insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+
+
+        insertionCursor = null;
+        return insertionCursor;
+
+
     }
 
+    GraphNode handleOverflow(ByteBuffer src, GraphNode insertionCursor, GraphNode progress) {
+        progress.pos += insertionCursor.len;
+        progress.len -= insertionCursor.len;
 
+        if (insertionCursor.nodes == null || insertionCursor.nodes.isEmpty()) {
+            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+        } else {
+            final GraphNode[] graphNodes = insertionCursor.nodes.toArray(new GraphNode[0]);
+
+            int ix = Arrays.binarySearch(graphNodes, progress, comparator);
+
+            if (ix >= 0) {
+
+
+            } else {
+                ix = -ix - 1;
+
+                insertionCursor.nodes.add(ix, progress);
+            }
+            GraphNode olderNode = insertionCursor.get(ix);
+
+            //if first byte of both nodes same
+            if (src.get(olderNode.pos) == src.get(progress.pos)) {
+
+                //cursor moves to olderNode 
+                insertionCursor = olderNode;
+
+            } else {
+                add(progress, insertionCursor);
+                insertionCursor = progress;// 
+            }
+        }
+        return insertionCursor;
+    }
+
+    String reify(final GraphNode progress) {
+        ByteBuffer buffer2 = src.duplicate();
+        Buffer buffer3 = null;
+        try {
+            buffer3 = buffer2.limit(progress.pos + progress.len);
+        } catch (Exception e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
+        ByteBuffer buffer1 = (ByteBuffer) buffer3.position(progress.pos);
+        final CharBuffer buffer = CHARSET.decode(buffer1);
+
+        return buffer.toString();
+    }
 
 
     void render(int depth, PrintStream c, GraphNode n) throws IOException {
@@ -140,9 +170,10 @@ public class Graph {
             c.print(reify(n));
         }
 
-if(n.nodes!=null)        for (GraphNode node : n.nodes) {
-            render(depth + 1, c, node);
-        }
+        if (n.nodes != null)
+            for (GraphNode node : n.nodes) {
+                if (node != null) render(depth + 1, c, node);
+            }
     }
 
 
@@ -165,12 +196,16 @@ if(n.nodes!=null)        for (GraphNode node : n.nodes) {
         public int compare(GraphNode o1, GraphNode o2) {
 
             int l = 0;
-            int c;
+            int c = 0;
             final int i = Math.min(o1.len, o2.len);
-            while ((0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
-                l++;
-                if (l > i)
-                    return o2.len - o1.len;
+            try {
+                while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
+                    l++;
+                    if (l > i)
+                        return o2.len - o1.len;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
             }
             return c;
         }
