@@ -58,7 +58,6 @@ public class Graph {
                 boolean overflow = false;
                 boolean isWhite = false;
                 boolean mustBifurcate = false;
-                byte loftByte = -1;
 
                 while (src.hasRemaining()
                         && !(isWhite = ((inByte = src.get()) < MINA))
@@ -66,8 +65,8 @@ public class Graph {
                         overflow = (insertionCursor != null
                                 && progress.len > insertionCursor.len
                         ))
-                        && (mustBifurcate = !src.hasRemaining() || progress != insertionCursor
-                        && (inByte != (loftByte = src.get(insertionCursor.pos + (progress.len)))
+                        && (mustBifurcate = /*!src.hasRemaining() ||  */insertionCursor != null
+                        && (inByte != (src.get(insertionCursor.pos + (progress.len)))
                 ))) {
                     join(src, progress);
                 }
@@ -80,13 +79,12 @@ public class Graph {
                 else
 
                     join(src, progress);
-                if (overflow || (insertionCursor != null
-                        && progress.len > insertionCursor.len
-                ))
+                if (overflow || (insertionCursor != null && progress.len > insertionCursor.len)) {
                     insertionCursor = handleOverflow(src, insertionCursor, progress);
-                else if (mustBifurcate && src.hasRemaining())
-
+                    continue;
+                } else if (mustBifurcate && src.hasRemaining()) {
                     insertionCursor = handleBifurcate(insertionCursor, progress);
+                }
             }
         }
     }
@@ -133,7 +131,8 @@ public class Graph {
 
                 //cursor moves to olderNode      
 //               
-          /*    src.position(src.position()-1);*/ /* progress.pos--;*/ return insertionCursor = olderNode;
+                /*    src.position(src.position()-1);*/ /* progress.pos--;*/
+                return insertionCursor = olderNode;
 //
 //            } else {
 //                add(progress, insertionCursor);
@@ -142,7 +141,7 @@ public class Graph {
 
             } else {
                 ix = -ix - 1;
-                progress.pos--;
+//                progress.pos--;
 
                 insertionCursor.nodes.add(ix, progress);
 //                progress.pos--;
