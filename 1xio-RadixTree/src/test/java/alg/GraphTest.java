@@ -98,13 +98,18 @@ public class GraphTest extends TestCase {
         assertEquals(3, aNode.pos);
         assertEquals(1, aNode.len);
 
-        assertEquals("a", graph.reify(aNode ));
+        assertEquals("a", graph.reify(aNode));
     }
 
 
     public void testOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a anvil apples"));
-        z(graph);
+        graph.create();
+        System.err.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
+
+        final Object[] objects = graph.root.nodes.toArray();
+
+        X_STREAM.toXML(graph, System.out);
 
 
         assertEquals(1, graph.root.nodes.size());
@@ -127,7 +132,12 @@ public class GraphTest extends TestCase {
 
     public void testUnOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a apple anvils"));
-        z(graph);
+        graph.create();
+        System.err.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
+
+        final Object[] objects = graph.root.nodes.toArray();
+
+        X_STREAM.toXML(graph, System.out);
 
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
@@ -149,7 +159,13 @@ public class GraphTest extends TestCase {
 
     public void testOrderedHierarchy() {
         Graph graph;
-        graph = new Graph(UTF8.encode("a app apple"));
+        graph = new Graph(UTF8.encode("a " +
+                "a" +
+                "pp " +
+                "a" +
+                "pp" +
+                "le apples" +
+                ""));
 
         z(graph);
 
@@ -160,19 +176,23 @@ public class GraphTest extends TestCase {
         assertEquals(1, aNode.len);
 
         final GraphNode ppNode = aNode.nodes.get(0);
-        assertEquals(4, ppNode.pos);
+        assertEquals(3, ppNode.pos);
         assertEquals(2, ppNode.len);
 
-        final GraphNode leNode = aNode.nodes.get(0);
-        assertEquals(10, leNode.pos);
+        final GraphNode leNode = ppNode.nodes.get(0);
+        assertEquals(9, leNode.pos);
         assertEquals(2, leNode.len);
 
+
+        final GraphNode sNode = leNode.nodes.get(0);
+        assertEquals(17, sNode.pos);
+        assertEquals(1, sNode.len);
 
     }
 
     private void z(Graph graph) {
         graph.create();
-        System.err.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
+        System.out.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
 
         final Object[] objects = graph.root.nodes.toArray();
 

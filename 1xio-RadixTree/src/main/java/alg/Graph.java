@@ -75,7 +75,7 @@ public class Graph {
 
                 if (isWhite) break;
 
-                if (src.hasRemaining()) progress.len = src.position() - progress.pos;
+              /*  if (src.hasRemaining()) */progress.len = src.position() - progress.pos;
 
                 if (overflow || (insertionCursor != null
                         && progress.len > insertionCursor.len
