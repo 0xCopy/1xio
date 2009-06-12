@@ -69,27 +69,33 @@ public class Graph {
                         && (mustBifurcate = !src.hasRemaining() || progress != insertionCursor
                         && (inByte != (loftByte = src.get(insertionCursor.pos + (progress.len)))
                 ))) {
-                    progress.len = src.position() - progress.pos;
+                    join(src, progress);
                 }
 
 
                 if (isWhite) break;
 
-              /*  if (src.hasRemaining()) */progress.len = src.position() - progress.pos;
 
+                if (!src.hasRemaining()) progress.len = src.limit() - progress.pos;
+                else
+
+                    join(src, progress);
                 if (overflow || (insertionCursor != null
                         && progress.len > insertionCursor.len
                 ))
                     insertionCursor = handleOverflow(src, insertionCursor, progress);
-                else if (mustBifurcate)
-                    insertionCursor = handleBifurcate(insertionCursor, progress);
+                else if (mustBifurcate && src.hasRemaining())
 
+                    insertionCursor = handleBifurcate(insertionCursor, progress);
             }
         }
     }
 
-    GraphNode handleBifurcate(GraphNode insertionCursor, GraphNode progress) {
+    private void join(ByteBuffer src, GraphNode progress) {
+        progress.len = src.position() - progress.pos;
+    }
 
+    GraphNode handleBifurcate(GraphNode insertionCursor, GraphNode progress) {
 
         int splitPoint = progress.len;
 
@@ -120,25 +126,29 @@ public class Graph {
             int ix = Arrays.binarySearch(graphNodes, progress, comparator);
 
             if (ix >= 0) {
+                GraphNode olderNode = insertionCursor.get(ix);
+//
+//            //if first byte of both nodes same
+//            if (src.get(olderNode.pos) == src.get(progress.pos)) {
 
+                //cursor moves to olderNode      
+//               
+          /*    src.position(src.position()-1);*/ /* progress.pos--;*/ return insertionCursor = olderNode;
+//
+//            } else {
+//                add(progress, insertionCursor);
+//                insertionCursor = progress;// 
+//            }
 
             } else {
                 ix = -ix - 1;
+                progress.pos--;
 
                 insertionCursor.nodes.add(ix, progress);
+//                progress.pos--;
+
             }
-            GraphNode olderNode = insertionCursor.get(ix);
 
-            //if first byte of both nodes same
-            if (src.get(olderNode.pos) == src.get(progress.pos)) {
-
-                //cursor moves to olderNode 
-                insertionCursor = olderNode;
-
-            } else {
-                add(progress, insertionCursor);
-                insertionCursor = progress;// 
-            }
         }
         return insertionCursor;
     }
@@ -201,8 +211,10 @@ public class Graph {
             try {
                 while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
                     l++;
-                    if (l > i)
-                        return o2.len - o1.len;
+                    if (l < i) {
+                    } else {
+                        return o1.len - o2.len;
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();  //TODO: Verify for a purpose

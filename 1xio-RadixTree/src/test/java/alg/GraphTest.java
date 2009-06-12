@@ -104,41 +104,26 @@ public class GraphTest extends TestCase {
 
     public void testOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a anvil apples"));
-        graph.create();
-        System.err.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
-
-        final Object[] objects = graph.root.nodes.toArray();
-
-        X_STREAM.toXML(graph, System.out);
-
-
+        z(graph);
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
 
-        assertEquals(1, graph.root.nodes.size());
-        final GraphNode nvilNode = aNode.nodes.get(0);
+        GraphNode nvilNode = aNode.get(0);
         assertEquals(4, nvilNode.pos);
-        assertEquals(4, nvilNode.len);
+        assertEquals(1, nvilNode.len);
 
-        assertEquals(1, graph.root.nodes.size());
-        final GraphNode ppleNode = aNode.nodes.get(1);
-        assertEquals(10, ppleNode.pos);
-        assertEquals(5, ppleNode.len);
+        GraphNode pplesNode = aNode.get(1);
+        assertEquals(9,pplesNode.pos);
+        assertEquals(4,pplesNode.len);
 
 
     }
 
     public void testUnOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a apple anvils"));
-        graph.create();
-        System.err.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
-
-        final Object[] objects = graph.root.nodes.toArray();
-
-        X_STREAM.toXML(graph, System.out);
-
+        z(graph);
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
@@ -147,13 +132,13 @@ public class GraphTest extends TestCase {
 
         assertEquals(1, graph.root.nodes.size());
         final GraphNode nvilNode = aNode.nodes.get(0);
-        assertEquals(4, nvilNode.pos);
-        assertEquals(4, nvilNode.len);
+        assertEquals(9, nvilNode.pos);
+        assertEquals(5, nvilNode.len);
 
         assertEquals(1, graph.root.nodes.size());
         final GraphNode ppleNode = aNode.nodes.get(1);
-        assertEquals(10, ppleNode.pos);
-        assertEquals(5, ppleNode.len);
+        assertEquals(4, ppleNode.pos);
+        assertEquals(4, ppleNode.len);
 
     }
 
@@ -197,7 +182,7 @@ public class GraphTest extends TestCase {
         final Object[] objects = graph.root.nodes.toArray();
 
         try {
-            graph.render(0, System.err, graph.root);
+            graph.render(0, System.out, graph.root);
         } catch (IOException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         }
