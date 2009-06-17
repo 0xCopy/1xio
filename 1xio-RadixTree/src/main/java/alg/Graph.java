@@ -89,6 +89,7 @@ public class Graph {
                     insertionCursor = handleOverflow(src, insertionCursor, progress);
                     continue;
                 } else  {
+                if(insertionCursor!=null)   
                     insertionCursor = handleBifurcate(insertionCursor, progress);
                 }
             }
