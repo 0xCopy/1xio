@@ -8,7 +8,7 @@ import java.util.concurrent.*;
 
 
 /**
- * this is a key graph of src ByteBuffer input token indexes.  the Node is a Triple {position,length,type} pointing to the graph (todo: remove the graph reference from graph node;.
+ * this is a key graph of src ByteBuffer input token indexes.  the Node is a Triple {position,length,type} pointing to the graph 
  * <p/>
  * User: jim
  * Date: Jun 7, 2009
@@ -210,4 +210,39 @@ public class Graph {
         }
     }
 
+    /**
+ * User: jim
+     * Date: Jun 8, 2009
+     * Time: 12:40:31 AM
+     */
+    static class GraphNode   {
+        int type, pos, len;
+        List<GraphNode> nodes;
+     
+        
+        public GraphNode(final int pos, int len, byte type
+        ) {
+            this.pos = pos;
+            this.len = len;
+            this.type = type;
+            
+        }
+    
+        public GraphNode() {
+            
+            
+        }
+    
+        @Override
+        public String toString() {
+            return "GraphNode{" +
+                    "len=" + len +
+                     ", pos=" + pos +
+                     '}';
+        }
+    
+        public GraphNode get(int i) {
+            return  nodes.get(i);
+        }
+    }
 }

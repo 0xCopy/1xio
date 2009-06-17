@@ -38,7 +38,7 @@ public class GraphTest extends TestCase {
         z(graph);
 
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode aNode = graph.root.nodes.get(0);
+        final Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
 
@@ -50,7 +50,7 @@ public class GraphTest extends TestCase {
         z(graph);
         assertEquals(2, graph.root.nodes.size());
 
-        GraphNode aNode = graph.root.nodes.get(0);
+        Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
         assertEquals("a", graph.reify(graph.root.nodes.get(0)));
@@ -69,7 +69,7 @@ public class GraphTest extends TestCase {
         z(graph);
         assertEquals(2, graph.root.nodes.size());
 
-        GraphNode aNode = graph.root.nodes.get(0);
+        Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(2, aNode.pos);
         assertEquals(1, aNode.len);
         assertEquals("a", graph.reify(graph.root.nodes.get(0)));
@@ -88,7 +88,7 @@ public class GraphTest extends TestCase {
         z(graph);
         assertEquals(1, graph.root.nodes.size());
 
-        GraphNode aNode = graph.root.nodes.get(0);
+        Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
         assertEquals("a", graph.reify(graph.root.nodes.get(0)));
@@ -106,7 +106,7 @@ public class GraphTest extends TestCase {
         z(graph);
         assertEquals(1, graph.root.nodes.size());
 
-        GraphNode aNode = graph.root.nodes.get(0);
+        Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
         assertEquals("a", graph.reify(graph.root.nodes.get(0)));
@@ -129,20 +129,20 @@ public class GraphTest extends TestCase {
 
 
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode aNode = graph.root.nodes.get(0);
+        final Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
 
-        final GraphNode ppNode = aNode.nodes.get(0);
+        final Graph.GraphNode ppNode = aNode.nodes.get(0);
         assertEquals(3, ppNode.pos);
         assertEquals(2, ppNode.len);
 
-        final GraphNode leNode = ppNode.nodes.get(0);
+        final Graph.GraphNode leNode = ppNode.nodes.get(0);
         assertEquals(9, leNode.pos);
         assertEquals(2, leNode.len);
 
 
-        final GraphNode sNode = leNode.nodes.get(0);
+        final Graph.GraphNode sNode = leNode.nodes.get(0);
         assertEquals(17, sNode.pos);
         assertEquals(1, sNode.len);
 
@@ -151,11 +151,11 @@ public class GraphTest extends TestCase {
         Graph graph = new Graph(UTF8.encode("a ab ac"));
         z(graph);
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode a = graph.root.nodes.get(0);
+        final Graph.GraphNode a = graph.root.nodes.get(0);
         assertEquals(0, a.pos);
         assertEquals(1, a.len);
 
-        GraphNode ab = a.get(0);
+        Graph.GraphNode ab = a.get(0);
         try {
             assertEquals(3, ab.pos);
         } catch (Error e) {
@@ -163,7 +163,7 @@ public class GraphTest extends TestCase {
         }
         assertEquals(1, ab.len);
 
-        GraphNode ac = a.get(1);
+        Graph.GraphNode ac = a.get(1);
         assertEquals(6,ac.pos);
         assertEquals(1,ac.len);
 
@@ -173,15 +173,16 @@ public class GraphTest extends TestCase {
         Graph graph = new Graph(UTF8.encode("ab ac"));
         z(graph);
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode aNode = graph.root.nodes.get(0);
+        final Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
+        assertNotSame( Graph.TYPE_DATA,aNode.type );
 
-        GraphNode firstChild = aNode.get(0);
+        Graph.GraphNode firstChild = aNode.get(0);
         assertEquals(1, firstChild.pos);
         assertEquals(1, firstChild.len);
 
-        GraphNode secondChild = aNode.get(1);
+        Graph.GraphNode secondChild = aNode.get(1);
         assertEquals(4,secondChild.pos);
         assertEquals(1,secondChild.len);
 
@@ -192,18 +193,18 @@ public class GraphTest extends TestCase {
         Graph graph = new Graph(UTF8.encode("a apple anvils"));
         z(graph);
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode aNode = graph.root.nodes.get(0);
+        final Graph.GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
 
 
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode nvilNode = aNode.nodes.get(0);
+        final Graph.GraphNode nvilNode = aNode.nodes.get(0);
         assertEquals(9, nvilNode.pos);
         assertEquals(5, nvilNode.len);
 
         assertEquals(1, graph.root.nodes.size());
-        final GraphNode ppleNode = aNode.nodes.get(1);
+        final Graph.GraphNode ppleNode = aNode.nodes.get(1);
         assertEquals(4, ppleNode.pos);
         assertEquals(4, ppleNode.len);
 
@@ -211,7 +212,7 @@ public class GraphTest extends TestCase {
 
     private void z(Graph graph) {
         graph.create();
-        System.out.println("\n--+ " + UTF8.decode(graph.src) + " +------------------");
+        System.out.println("\n--+ " + UTF8.decode(graph.src) + " +-------");
 
         final Object[] objects = graph.root.nodes.toArray();
 
