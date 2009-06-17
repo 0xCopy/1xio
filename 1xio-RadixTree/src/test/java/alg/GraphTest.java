@@ -101,6 +101,24 @@ public class GraphTest extends TestCase {
         assertEquals("a", graph.reify(aNode));
     }
 
+    public void testChildPrecedes() {
+        final Graph graph = new Graph(UTF8.encode("aa a"));
+        z(graph);
+        assertEquals(1, graph.root.nodes.size());
+
+        GraphNode aNode = graph.root.nodes.get(0);
+        assertEquals(0, aNode.pos);
+        assertEquals(1, aNode.len);
+        assertEquals("a", graph.reify(graph.root.nodes.get(0)));
+
+
+        aNode = aNode.get(0);
+        assertEquals(1, aNode.pos);
+        assertEquals(1, aNode.len);
+
+        assertEquals("a", graph.reify(aNode));
+    }
+
 
     public void testOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a anvil apples"));
@@ -143,14 +161,8 @@ public class GraphTest extends TestCase {
     }
 
     public void testOrderedHierarchy() {
-        Graph graph;
-        graph = new Graph(UTF8.encode("a " +
-                "a" +
-                "pp " +
-                "a" +
-                "pp" +
-                "le apples" +
-                ""));
+        final Graph  
+        graph = new Graph(UTF8.encode("a app apple apples"));
 
         z(graph);
 

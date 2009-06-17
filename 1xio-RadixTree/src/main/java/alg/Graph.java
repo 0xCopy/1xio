@@ -23,7 +23,6 @@ public class Graph {
     private static final int MINA = (int) 'a' <= (int) 'A' ? (int) 'a' : (int) 'A';
     private static final Charset UTF8 = Charset.forName("UTF8");
     private static final Charset CHARSET = UTF8;
-    private static final ByteBuffer EOL = UTF8.encode(",");
     public final Comparator<GraphNode> comparator;
 
 
@@ -37,9 +36,9 @@ public class Graph {
     /**
      * this is a lazy creation indexer of input bytes.
      * <p/>
-     * nodes are added to the tree on the basis of thier first byte,
+     * nodes are anchored to the tree on the basis of thier first byte,
      * and worst case tree is a trie structure.  as we parse each byte of the input token, we prolong its length,
-     * we end it, or we move a prospective parent into the cursor sites.
+     * we end it , or we move a nearer-matching parent into the insertionCursor.
      * <p/>
      * nodes are stored in sorted arrays based on indirect bytes described by (pos,len) pairs.
      */
@@ -48,25 +47,32 @@ public class Graph {
         newNode:
         while (src.hasRemaining()) {
 
-            GraphNode insertionCursor = root;
-            final GraphNode progress = new GraphNode(src.position(), 0, TYPE_DATA/*, this*/);
-
-            //grab token.
+            int tokenStart = src.position();
+            final GraphNode progress = new GraphNode(tokenStart, 0, TYPE_DATA/*, this*/);
+//            byte peekByte = src.get(src.position());
             byte inByte = 0;
+
+            GraphNode insertionCursor = null;
+
+            progress.len = 1;
+            insertionCursor = handleOverflow(src, root, progress);
+            progress.pos = tokenStart;
+            progress.len = 0;
+
+
             while (src.hasRemaining()) {
 
                 boolean overflow = false;
                 boolean isWhite = false;
-                boolean mustBifurcate = false;
 
                 while (src.hasRemaining()
                         && !(isWhite = ((inByte = src.get()) < MINA))
                         && !(
                         overflow = (insertionCursor != null
                                 && progress.len > insertionCursor.len
-                        ))
-                        && (mustBifurcate = /*!src.hasRemaining() ||  */insertionCursor != null
-                        && (inByte != (src.get(insertionCursor.pos + (progress.len)))
+                        )
+                        
+                        && (inByte == (src.get(insertionCursor.pos + (progress.len)))
                 ))) {
                     join(src, progress);
                 }
@@ -74,15 +80,15 @@ public class Graph {
 
                 if (isWhite) break;
 
-
+                /*
                 if (!src.hasRemaining()) progress.len = src.limit() - progress.pos;
-                else
+                else*/
 
                     join(src, progress);
                 if (overflow || (insertionCursor != null && progress.len > insertionCursor.len)) {
                     insertionCursor = handleOverflow(src, insertionCursor, progress);
                     continue;
-                } else if (mustBifurcate && src.hasRemaining()) {
+                } else  {
                     insertionCursor = handleBifurcate(insertionCursor, progress);
                 }
             }
@@ -116,38 +122,22 @@ public class Graph {
         progress.pos += insertionCursor.len;
         progress.len -= insertionCursor.len;
 
-        if (insertionCursor.nodes == null || insertionCursor.nodes.isEmpty()) {
-            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
-        } else {
+        if (insertionCursor.nodes != null && !insertionCursor.nodes.isEmpty()) {
             final GraphNode[] graphNodes = insertionCursor.nodes.toArray(new GraphNode[0]);
 
             int ix = Arrays.binarySearch(graphNodes, progress, comparator);
 
             if (ix >= 0) {
-                GraphNode olderNode = insertionCursor.get(ix);
-//
-//            //if first byte of both nodes same
-//            if (src.get(olderNode.pos) == src.get(progress.pos)) {
-
-                //cursor moves to olderNode      
-//               
-                /*    src.position(src.position()-1);*/ /* progress.pos--;*/
-                return insertionCursor = olderNode;
-//
-//            } else {
-//                add(progress, insertionCursor);
-//                insertionCursor = progress;// 
-//            }
-
+                GraphNode olderNode = insertionCursor.get(ix); 
+                return insertionCursor = olderNode; 
             } else {
-                ix = -ix - 1;
-//                progress.pos--;
-
-                insertionCursor.nodes.add(ix, progress);
-//                progress.pos--;
-
+                ix = -ix - 1; 
+                insertionCursor.nodes.add(ix, progress); 
             }
 
+        } else {
+            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+            return null;
         }
         return insertionCursor;
     }
@@ -210,8 +200,7 @@ public class Graph {
             try {
                 while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
                     l++;
-                    if (l < i) {
-                    } else {
+                    if (l >i) { 
                         return o1.len - o2.len;
                     }
                 }
