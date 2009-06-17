@@ -119,7 +119,34 @@ public class GraphTest extends TestCase {
         assertEquals("a", graph.reify(aNode));
     }
 
+                
 
+    public void testOrderedHierarchy() {
+        final Graph  
+        graph = new Graph(UTF8.encode("a app apple apples"));
+
+        z(graph);
+
+
+        assertEquals(1, graph.root.nodes.size());
+        final GraphNode aNode = graph.root.nodes.get(0);
+        assertEquals(0, aNode.pos);
+        assertEquals(1, aNode.len);
+
+        final GraphNode ppNode = aNode.nodes.get(0);
+        assertEquals(3, ppNode.pos);
+        assertEquals(2, ppNode.len);
+
+        final GraphNode leNode = ppNode.nodes.get(0);
+        assertEquals(9, leNode.pos);
+        assertEquals(2, leNode.len);
+
+
+        final GraphNode sNode = leNode.nodes.get(0);
+        assertEquals(17, sNode.pos);
+        assertEquals(1, sNode.len);
+
+    }
     public void testOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a ab ac"));
         z(graph);
@@ -180,34 +207,7 @@ public class GraphTest extends TestCase {
         assertEquals(4, ppleNode.pos);
         assertEquals(4, ppleNode.len);
 
-    }
-
-    public void testOrderedHierarchy() {
-        final Graph  
-        graph = new Graph(UTF8.encode("a app apple apples"));
-
-        z(graph);
-
-
-        assertEquals(1, graph.root.nodes.size());
-        final GraphNode aNode = graph.root.nodes.get(0);
-        assertEquals(0, aNode.pos);
-        assertEquals(1, aNode.len);
-
-        final GraphNode ppNode = aNode.nodes.get(0);
-        assertEquals(3, ppNode.pos);
-        assertEquals(2, ppNode.len);
-
-        final GraphNode leNode = ppNode.nodes.get(0);
-        assertEquals(9, leNode.pos);
-        assertEquals(2, leNode.len);
-
-
-        final GraphNode sNode = leNode.nodes.get(0);
-        assertEquals(17, sNode.pos);
-        assertEquals(1, sNode.len);
-
-    }
+    }   
 
     private void z(Graph graph) {
         graph.create();
