@@ -10,8 +10,7 @@ import java.util.*;
 class GraphNode   {
     int type, pos, len;
     List<GraphNode> nodes;
-//     private  final GraphNode[] A ;
-
+ 
     
     public GraphNode(final int pos, int len, byte type
     ) {

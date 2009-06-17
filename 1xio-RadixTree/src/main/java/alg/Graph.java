@@ -47,9 +47,8 @@ public class Graph {
         newNode:
         while (src.hasRemaining()) {
 
-            int tokenStart = src.position();
-            final GraphNode progress = new GraphNode(tokenStart, 0, TYPE_DATA/*, this*/);
-//            byte peekByte = src.get(src.position());
+            final int tokenStart = src.position();
+            final GraphNode progress = new GraphNode(tokenStart, 0, TYPE_DATA);
             byte inByte = 0;
 
             GraphNode insertionCursor = null;
@@ -67,42 +66,39 @@ public class Graph {
 
                 while (src.hasRemaining()
                         && !(isWhite = ((inByte = src.get()) < MINA))
-                        && !(
-                        overflow = (insertionCursor != null
-                                && progress.len > insertionCursor.len
-                        )
-                        
-                        && (inByte == (src.get(insertionCursor.pos + (progress.len)))
-                ))) {
+                        && !(overflow = (insertionCursor != null
+                        && progress.len >= insertionCursor.len))
+                        && (insertionCursor != null) && (inByte == (src.get(insertionCursor.pos + progress.len)))) {
                     join(src, progress);
                 }
 
 
                 if (isWhite) break;
 
-                /*
-                if (!src.hasRemaining()) progress.len = src.limit() - progress.pos;
-                else*/
 
-                    join(src, progress);
+                join(src, progress);
                 if (overflow || (insertionCursor != null && progress.len > insertionCursor.len)) {
                     insertionCursor = handleOverflow(src, insertionCursor, progress);
                     continue;
-                } else  {
-                if(insertionCursor!=null)   
-                    insertionCursor = handleBifurcate(insertionCursor, progress);
+                } else {
+                    if (insertionCursor != null)
+                        insertionCursor = handleBifurcate(insertionCursor, progress);
+                    else
+                        do {
+                        } while (false);
                 }
+
             }
         }
     }
 
-    private void join(ByteBuffer src, GraphNode progress) {
+    private void join(final ByteBuffer src, final GraphNode progress) {
         progress.len = src.position() - progress.pos;
     }
 
-    GraphNode handleBifurcate(GraphNode insertionCursor, GraphNode progress) {
+    GraphNode handleBifurcate(GraphNode insertionCursor, final GraphNode progress) {
 
-        int splitPoint = progress.len;
+        final int splitPoint = progress.len;
 
         progress.pos = insertionCursor.pos + splitPoint;
         progress.len = insertionCursor.len - splitPoint;
@@ -119,7 +115,7 @@ public class Graph {
 
     }
 
-    GraphNode handleOverflow(ByteBuffer src, GraphNode insertionCursor, GraphNode progress) {
+    GraphNode handleOverflow(final ByteBuffer src, GraphNode insertionCursor, final GraphNode progress) {
         progress.pos += insertionCursor.len;
         progress.len -= insertionCursor.len;
 
@@ -129,11 +125,11 @@ public class Graph {
             int ix = Arrays.binarySearch(graphNodes, progress, comparator);
 
             if (ix >= 0) {
-                GraphNode olderNode = insertionCursor.get(ix); 
-                return insertionCursor = olderNode; 
+                final GraphNode olderNode = insertionCursor.get(ix);
+                return insertionCursor = olderNode;
             } else {
-                ix = -ix - 1; 
-                insertionCursor.nodes.add(ix, progress); 
+                ix = -ix - 1;
+                insertionCursor.nodes.add(ix, progress);
             }
 
         } else {
@@ -144,21 +140,21 @@ public class Graph {
     }
 
     String reify(final GraphNode progress) {
-        ByteBuffer buffer2 = src.duplicate();
+        final ByteBuffer buffer2 = src.duplicate();
         Buffer buffer3 = null;
         try {
             buffer3 = buffer2.limit(progress.pos + progress.len);
         } catch (Exception e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         }
-        ByteBuffer buffer1 = (ByteBuffer) buffer3.position(progress.pos);
+        final ByteBuffer buffer1 = (ByteBuffer) buffer3.position(progress.pos);
         final CharBuffer buffer = CHARSET.decode(buffer1);
 
         return buffer.toString();
     }
 
 
-    void render(int depth, PrintStream c, GraphNode n) throws IOException {
+    void render(final int depth, final PrintStream c, final GraphNode n) throws IOException {
         c.print('\n');
 
         for (int i = 0; i < depth; i++) {
@@ -171,17 +167,19 @@ public class Graph {
         }
 
         if (n.nodes != null)
-            for (GraphNode node : n.nodes) {
-                if (node != null) render(depth + 1, c, node);
+            for (final GraphNode node : n.nodes) {
+                if (node != null)
+                    render(depth + 1, c, node);
             }
     }
 
 
-    public void add(final GraphNode progress, GraphNode parent) {
+    public void add(final GraphNode progress, final GraphNode parent) {
         if (parent.nodes == null || parent.nodes.isEmpty()) {
             parent.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
         } else {
             parent.nodes.add(progress);
+            //noinspection unchecked
             Arrays.sort(parent.nodes.toArray(), (Comparator) comparator);
         }
     }
@@ -193,7 +191,7 @@ public class Graph {
      */
     class GraphComparator implements Comparator<GraphNode> {
 
-        public int compare(GraphNode o1, GraphNode o2) {
+        public int compare(final GraphNode o1, final GraphNode o2) {
 
             int l = 0;
             int c = 0;
@@ -201,7 +199,7 @@ public class Graph {
             try {
                 while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
                     l++;
-                    if (l >i) { 
+                    if (l > i) {
                         return o1.len - o2.len;
                     }
                 }

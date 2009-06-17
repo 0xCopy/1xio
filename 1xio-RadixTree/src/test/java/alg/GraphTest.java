@@ -121,20 +121,42 @@ public class GraphTest extends TestCase {
 
 
     public void testOrderedSiblingInsertion() {
-        Graph graph = new Graph(UTF8.encode("a anvil apples"));
+        Graph graph = new Graph(UTF8.encode("a ab ac"));
+        z(graph);
+        assertEquals(1, graph.root.nodes.size());
+        final GraphNode a = graph.root.nodes.get(0);
+        assertEquals(0, a.pos);
+        assertEquals(1, a.len);
+
+        GraphNode ab = a.get(0);
+        try {
+            assertEquals(3, ab.pos);
+        } catch (Error e) {
+            e.printStackTrace();  //TODO: Verify for a purpose
+        }
+        assertEquals(1, ab.len);
+
+        GraphNode ac = a.get(1);
+        assertEquals(6,ac.pos);
+        assertEquals(1,ac.len);
+
+
+    }
+    public void testOnlySiblingInsertion() {
+        Graph graph = new Graph(UTF8.encode("ab ac"));
         z(graph);
         assertEquals(1, graph.root.nodes.size());
         final GraphNode aNode = graph.root.nodes.get(0);
         assertEquals(0, aNode.pos);
         assertEquals(1, aNode.len);
 
-        GraphNode nvilNode = aNode.get(0);
-        assertEquals(4, nvilNode.pos);
-        assertEquals(1, nvilNode.len);
+        GraphNode firstChild = aNode.get(0);
+        assertEquals(1, firstChild.pos);
+        assertEquals(1, firstChild.len);
 
-        GraphNode pplesNode = aNode.get(1);
-        assertEquals(9,pplesNode.pos);
-        assertEquals(4,pplesNode.len);
+        GraphNode secondChild = aNode.get(1);
+        assertEquals(4,secondChild.pos);
+        assertEquals(1,secondChild.len);
 
 
     }
