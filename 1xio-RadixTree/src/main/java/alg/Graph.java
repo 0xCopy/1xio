@@ -82,7 +82,6 @@ public class Graph {
 
                     if (overflow || (active && progress.len > insertionCursor.len)) {
                         insertionCursor = handleOverflow(src, insertionCursor, progress);
-                        continue;
                     } else {
                         if (active)
                             insertionCursor = handleBifurcate(insertionCursor, progress, direction);
@@ -91,8 +90,8 @@ public class Graph {
                 } else {
                     break;
                 }
-
-
+                 
+                if (!src.hasRemaining()) join(src, progress);
             }
         }
     }

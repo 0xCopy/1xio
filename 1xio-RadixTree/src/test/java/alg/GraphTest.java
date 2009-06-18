@@ -181,13 +181,13 @@ public class GraphTest extends TestCase {
         Graph.GraphNode b = a.get(0);
         assertEquals(1, b.pos);
         assertEquals(1, b.len);
-        assertSame( Graph.TYPE_DATA, a.type );
+        assertSame( Graph.TYPE_DATA, b.type );
                                    
         Graph.GraphNode c = a.get(1);
-        assertEquals(4,c.pos);
-        assertEquals(1,c.len);
-
-
+        assertEquals(4, c.pos);
+        assertEquals(1, c.len);
+        assertSame( Graph.TYPE_DATA, c.type );
+    
     }
 
     public void testUnOrderedSiblingInsertion() {
