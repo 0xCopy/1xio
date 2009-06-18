@@ -64,11 +64,12 @@ public class Graph {
                 boolean overflow = false;
                 boolean isWhite = false;
 
+                final boolean active = insertionCursor != null;
                 while (src.hasRemaining()
                         && !(isWhite = ((inByte = src.get()) < MINA))
-                        && !(overflow = (insertionCursor != null
+                        && !(overflow = (active
                         && progress.len >= insertionCursor.len))
-                        && (insertionCursor != null) && (inByte == (src.get(insertionCursor.pos + progress.len)))) {
+                        && active && (inByte == (src.get(insertionCursor.pos + progress.len)))) {
                     join(src, progress);
                 }
 
@@ -77,11 +78,11 @@ public class Graph {
 
 
                 join(src, progress);
-                if (overflow || (insertionCursor != null && progress.len > insertionCursor.len)) {
+                if (overflow || (active && progress.len > insertionCursor.len)) {
                     insertionCursor = handleOverflow(src, insertionCursor, progress);
                     continue;
                 } else {
-                    if (insertionCursor != null)
+                    if (active)
                         insertionCursor = handleBifurcate(insertionCursor, progress);
                     else
                         do {
