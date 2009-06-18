@@ -196,7 +196,7 @@ public class Graph {
 
     void render(final int depth, final PrintStream c, final GraphNode n) throws IOException {
         c.print('\n');
-
+        if (depth > 20) throw new Error("suspect recursion");
         for (int i = 0; i < depth; i++) {
             c.write(' ');
         }
