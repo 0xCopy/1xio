@@ -8,7 +8,7 @@ import java.util.concurrent.*;
 
 
 /**
- * this is a key graph of src ByteBuffer input token indexes.  the Node is a Triple {position,length,type} pointing to the graph 
+ * this is a key graph of src ByteBuffer input token indexes.  the Node is a Triple {position,length,type} pointing to the graph
  * <p/>
  * User: jim
  * Date: Jun 7, 2009
@@ -60,34 +60,35 @@ public class Graph {
 
 
             while (src.hasRemaining()) {
-
+                              
                 boolean overflow = false;
-                boolean isWhite = false;
-
+                boolean isWhite = false; 
                 final boolean active = insertionCursor != null;
+                boolean differ=false;
                 while (src.hasRemaining()
                         && !(isWhite = ((inByte = src.get()) < MINA))
-                        && !(overflow = (active
-                        && progress.len >= insertionCursor.len))
-                        && active && (inByte == (src.get(insertionCursor.pos + progress.len)))) {
+                        && active
+                        && !(overflow = ( progress.len >= insertionCursor.len))
+                        && 0== (inByte - (src.get(insertionCursor.pos + progress.len)))) {
                     join(src, progress);
                 }
 
 
-                if (isWhite) break;
+                if (!isWhite) {
+                    join(src, progress);
 
+                    if (overflow || (active && progress.len > insertionCursor.len)) {
+                        insertionCursor = handleOverflow(src, insertionCursor, progress);
+                        continue;
+                    } else {
+                        if (active)
+                            insertionCursor = handleBifurcate(insertionCursor, progress);
 
-                join(src, progress);
-                if (overflow || (active && progress.len > insertionCursor.len)) {
-                    insertionCursor = handleOverflow(src, insertionCursor, progress);
-                    continue;
+                    }
                 } else {
-                    if (active)
-                        insertionCursor = handleBifurcate(insertionCursor, progress);
-                    else
-                        do {
-                        } while (false);
+                    break;
                 }
+
 
             }
         }
@@ -98,22 +99,16 @@ public class Graph {
     }
 
     GraphNode handleBifurcate(GraphNode insertionCursor, final GraphNode progress) {
-
+        if (progress.len == 0)
+            return insertionCursor;
         final int splitPoint = progress.len;
-
         progress.pos = insertionCursor.pos + splitPoint;
         progress.len = insertionCursor.len - splitPoint;
-
         insertionCursor.len = progress.pos - insertionCursor.pos;
-
         progress.nodes = insertionCursor.nodes;
         insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
 
-
-        insertionCursor = null;
-        return insertionCursor;
-
-
+        return null;
     }
 
     GraphNode handleOverflow(final ByteBuffer src, GraphNode insertionCursor, final GraphNode progress) {
@@ -212,38 +207,38 @@ public class Graph {
     }
 
     /**
- * User: jim
+     * User: jim
      * Date: Jun 8, 2009
      * Time: 12:40:31 AM
      */
-    static class GraphNode   {
+    static class GraphNode {
         int type, pos, len;
         List<GraphNode> nodes;
-     
-        
+
+
         public GraphNode(final int pos, int len, byte type
         ) {
             this.pos = pos;
             this.len = len;
             this.type = type;
-            
+
         }
-    
+
         public GraphNode() {
-            
-            
+
+
         }
-    
+
         @Override
         public String toString() {
             return "GraphNode{" +
                     "len=" + len +
-                     ", pos=" + pos +
-                     '}';
+                    ", pos=" + pos +
+                    '}';
         }
-    
+
         public GraphNode get(int i) {
-            return  nodes.get(i);
+            return nodes.get(i);
         }
     }
 }
