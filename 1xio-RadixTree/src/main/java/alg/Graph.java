@@ -60,16 +60,17 @@ public class Graph {
 
 
             while (src.hasRemaining()) {
-                              
+
                 boolean overflow = false;
-                boolean isWhite = false; 
+                boolean isWhite = false;
                 final boolean active = insertionCursor != null;
-                boolean differ=false;
+                boolean differ = false;
+                int direction = 0;
                 while (src.hasRemaining()
                         && !(isWhite = ((inByte = src.get()) < MINA))
                         && active
-                        && !(overflow = ( progress.len >= insertionCursor.len))
-                        && 0== (inByte - (src.get(insertionCursor.pos + progress.len)))) {
+                        && !(overflow = (progress.len >= insertionCursor.len))
+                        && (0 == (direction = (inByte - (src.get(insertionCursor.pos + progress.len)))))) {
                     join(src, progress);
                 }
 
@@ -82,7 +83,7 @@ public class Graph {
                         continue;
                     } else {
                         if (active)
-                            insertionCursor = handleBifurcate(insertionCursor, progress);
+                            insertionCursor = handleBifurcate(insertionCursor, progress, direction);
 
                     }
                 } else {
@@ -98,17 +99,32 @@ public class Graph {
         progress.len = src.position() - progress.pos;
     }
 
-    GraphNode handleBifurcate(GraphNode insertionCursor, final GraphNode progress) {
-        if (progress.len == 0)
-            return insertionCursor;
-        final int splitPoint = progress.len;
-        progress.pos = insertionCursor.pos + splitPoint;
-        progress.len = insertionCursor.len - splitPoint;
-        insertionCursor.len = progress.pos - insertionCursor.pos;
-        progress.nodes = insertionCursor.nodes;
-        insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+    GraphNode handleBifurcate(GraphNode insertionCursor, final GraphNode progress, int direction) {
 
-        return null;
+        final int splitPoint = progress.len;
+
+
+        if (direction < 0) {
+            progress.pos = insertionCursor.pos + splitPoint;
+            progress.len = insertionCursor.len - splitPoint;
+
+            insertionCursor.len = progress.pos - insertionCursor.pos;
+            progress.nodes = insertionCursor.nodes;
+            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+            return null;
+        } else {
+            //create synthetic midpoint
+            GraphNode synth = new GraphNode(insertionCursor.pos + splitPoint, insertionCursor.len - splitPoint, (byte) 0);
+            int prior = insertionCursor.len;
+            
+            synth.nodes = insertionCursor.nodes;
+            insertionCursor.nodes=new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{synth,progress});
+            insertionCursor.len-=splitPoint;
+            progress.pos+=splitPoint;
+            progress.len-=prior-splitPoint ;  
+            return null;
+        }
+//        return null;
     }
 
     GraphNode handleOverflow(final ByteBuffer src, GraphNode insertionCursor, final GraphNode progress) {
@@ -116,7 +132,7 @@ public class Graph {
         progress.len -= insertionCursor.len;
 
         if (insertionCursor.nodes != null && !insertionCursor.nodes.isEmpty()) {
-            final GraphNode[] graphNodes = insertionCursor.nodes.toArray(new GraphNode[0]);
+            final GraphNode[] graphNodes = insertionCursor.nodes.toArray(new GraphNode[insertionCursor.nodes.size()]);
 
             int ix = Arrays.binarySearch(graphNodes, progress, comparator);
 
@@ -125,7 +141,33 @@ public class Graph {
                 return insertionCursor = olderNode;
             } else {
                 ix = -ix - 1;
-                insertionCursor.nodes.add(ix, progress);
+                ((CopyOnWriteArrayList) insertionCursor.nodes).add(ix, progress);
+                /*
+                final ReentrantLock lock = ((CopyOnWriteArrayList) insertionCursor.nodes).lock;
+                lock.lock();
+                try {
+                    Object[] elements = ((CopyOnWriteArrayList) insertionCursor.nodes).getArray();
+                    int len = elements.length;
+                    if (ix > len || ix < 0)
+                    throw new IndexOutOfBoundsException("Index: "+ ix +
+                                        ", Size: "+len);
+                    Object[] newElements;
+                    int numMoved = len - ix;
+                    if (numMoved == 0)
+                    newElements = Arrays.copyOf(elements, len + 1);
+                    else {
+                    newElements = new Object[len + 1];
+                    System.arraycopy(elements, 0, newElements, 0, ix);
+                    System.arraycopy(elements, ix, newElements, ix + 1,
+                             numMoved);
+                    }
+                    newElements[ix] = progress;
+                    ((CopyOnWriteArrayList) insertionCursor.nodes).setArray(newElements);
+                } finally {
+                    lock.unlock();
+                }
+                
+                 */
             }
 
         } else {
