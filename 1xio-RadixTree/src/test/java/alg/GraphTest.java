@@ -176,15 +176,16 @@ public class GraphTest extends TestCase {
         final Graph.GraphNode a = graph.root.nodes.get(0);
         assertEquals(0, a.pos);
         assertEquals(1, a.len);
-        assertNotSame( Graph.TYPE_DATA,a.type );
+        assertNotSame( Graph.TYPE_DATA, a.type );
 
-        Graph.GraphNode firstChild = a.get(0);
-        assertEquals(1, firstChild.pos);
-        assertEquals(1, firstChild.len);
-
-        Graph.GraphNode secondChild = a.get(1);
-        assertEquals(4,secondChild.pos);
-        assertEquals(1,secondChild.len);
+        Graph.GraphNode b = a.get(0);
+        assertEquals(1, b.pos);
+        assertEquals(1, b.len);
+        assertSame( Graph.TYPE_DATA, a.type );
+                                   
+        Graph.GraphNode c = a.get(1);
+        assertEquals(4,c.pos);
+        assertEquals(1,c.len);
 
 
     }

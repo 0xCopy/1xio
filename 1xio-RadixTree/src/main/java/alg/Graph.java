@@ -18,7 +18,7 @@ public class Graph {
     final ByteBuffer src;
 
 
-    static final byte TYPE_DATA = 1;
+    static final int TYPE_DATA = 1;
     GraphNode root = new GraphNode();
     private static final int MINA = (int) 'a' <= (int) 'A' ? (int) 'a' : (int) 'A';
     private static final Charset UTF8 = Charset.forName("UTF8");
@@ -76,7 +76,9 @@ public class Graph {
 
 
                 if (!isWhite) {
-                    join(src, progress);
+                    if (direction <= 0) {
+                        join(src, progress);
+                    }
 
                     if (overflow || (active && progress.len > insertionCursor.len)) {
                         insertionCursor = handleOverflow(src, insertionCursor, progress);
@@ -114,14 +116,15 @@ public class Graph {
             return null;
         } else {
             //create synthetic midpoint
-            GraphNode synth = new GraphNode(insertionCursor.pos + splitPoint, insertionCursor.len - splitPoint, (byte) 0);
+            GraphNode synth = new GraphNode(insertionCursor.pos + splitPoint, insertionCursor.len - splitPoint, (byte) insertionCursor.type);
             int prior = insertionCursor.len;
-            
+
             synth.nodes = insertionCursor.nodes;
-            insertionCursor.nodes=new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{synth,progress});
-            insertionCursor.len-=splitPoint;
-            progress.pos+=splitPoint;
-            progress.len-=prior-splitPoint ;  
+            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{synth, progress});
+            insertionCursor.len -= splitPoint;
+            insertionCursor.type = 0;
+            progress.pos += splitPoint;
+            progress.len -= prior - splitPoint;
             return null;
         }
 //        return null;
@@ -258,7 +261,7 @@ public class Graph {
         List<GraphNode> nodes;
 
 
-        public GraphNode(final int pos, int len, byte type
+        public GraphNode(final int pos, int len, int type
         ) {
             this.pos = pos;
             this.len = len;
