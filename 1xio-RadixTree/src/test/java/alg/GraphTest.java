@@ -119,11 +119,10 @@ public class GraphTest extends TestCase {
         assertEquals("a", graph.reify(aNode));
     }
 
-                
 
     public void testOrderedHierarchy() {
-        final Graph  
-        graph = new Graph(UTF8.encode("a app apple apples"));
+        final Graph
+                graph = new Graph(UTF8.encode("a app apple apples"));
 
         z(graph);
 
@@ -147,6 +146,7 @@ public class GraphTest extends TestCase {
         assertEquals(1, sNode.len);
 
     }
+
     public void testOrderedSiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("a ab ac"));
         z(graph);
@@ -164,11 +164,12 @@ public class GraphTest extends TestCase {
         assertEquals(1, ab.len);
 
         Graph.GraphNode ac = a.get(1);
-        assertEquals(6,ac.pos);
-        assertEquals(1,ac.len);
+        assertEquals(6, ac.pos);
+        assertEquals(1, ac.len);
 
 
     }
+
     public void testOnlySiblingInsertion() {
         Graph graph = new Graph(UTF8.encode("ab ac"));
         z(graph);
@@ -176,18 +177,39 @@ public class GraphTest extends TestCase {
         final Graph.GraphNode a = graph.root.nodes.get(0);
         assertEquals(0, a.pos);
         assertEquals(1, a.len);
-        assertNotSame( Graph.TYPE_DATA, a.type );
+        assertNotSame(Graph.TYPE_DATA, a.type);
 
         Graph.GraphNode b = a.get(0);
         assertEquals(1, b.pos);
         assertEquals(1, b.len);
-        assertSame( Graph.TYPE_DATA, b.type );
-                                   
+        assertSame(Graph.TYPE_DATA, b.type);
+
         Graph.GraphNode c = a.get(1);
         assertEquals(4, c.pos);
         assertEquals(1, c.len);
-        assertSame( Graph.TYPE_DATA, c.type );
-    
+        assertSame(Graph.TYPE_DATA, c.type);
+
+    }
+
+    public void testOnlyUnorderedSiblingInsertion() {
+        Graph graph = new Graph(UTF8.encode("ac ab"));
+        z(graph);
+        assertEquals(1, graph.root.nodes.size());
+        final Graph.GraphNode a = graph.root.nodes.get(0);
+        assertEquals(0, a.pos);
+        assertEquals(1, a.len);
+        assertNotSame(Graph.TYPE_DATA, a.type);
+
+        Graph.GraphNode c = a.get(1);
+        assertEquals(1, c.pos);
+        assertEquals(1, c.len);
+        assertSame(Graph.TYPE_DATA, c.type);
+
+        Graph.GraphNode b = a.get(0);
+        assertEquals(4, b.pos);
+        assertEquals(1, b.len);
+        assertSame(Graph.TYPE_DATA, b.type);
+
     }
 
     public void testUnOrderedSiblingInsertion() {
@@ -209,18 +231,24 @@ public class GraphTest extends TestCase {
         assertEquals(4, ppleNode.pos);
         assertEquals(4, ppleNode.len);
 
-    }   
+    }
 
     private void z(Graph graph) {
         graph.create();
-        System.out.println("\n--+ " + UTF8.decode(graph.src) + " +-------");
+        System.out.println("--+ " + UTF8.decode(graph.src) + " +-------");
 
         final Object[] objects = graph.root.nodes.toArray();
 
+
         try {
             graph.render(0, System.out, graph.root);
+        } catch (Error e) {
+//            e.printStackTrace();  //TODO: Verify for a purpose
+            X_STREAM.toXML(graph,
+                    System.out);
         } catch (IOException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         }
+        System.out.print('\n');
     }
 }

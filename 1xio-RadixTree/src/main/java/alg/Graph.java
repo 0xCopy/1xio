@@ -59,14 +59,14 @@ public class Graph {
             progress.len = 0;
 
 
-            while (src.hasRemaining()) {
+            while (progress.pos+progress.len<src.limit()) {
 
                 boolean overflow = false;
                 boolean isWhite = false;
                 final boolean active = insertionCursor != null;
                 boolean differ = false;
                 int direction = 0;
-                while (src.hasRemaining()
+                while (progress.pos+progress.len<src.limit()
                         && !(isWhite = ((inByte = src.get()) < MINA))
                         && active
                         && !(overflow = (progress.len >= insertionCursor.len))
@@ -76,22 +76,29 @@ public class Graph {
 
 
                 if (!isWhite) {
-                    if (direction <= 0) {
+                    if (direction== 0) {
                         join(src, progress);
                     }
 
                     if (overflow || (active && progress.len > insertionCursor.len)) {
                         insertionCursor = handleOverflow(src, insertionCursor, progress);
                     } else {
-                        if (active)
+                        if (active) {
                             insertionCursor = handleBifurcate(insertionCursor, progress, direction);
+                        
+                            if(insertionCursor==progress){
+                                insertionCursor=null;
+                                continue;
+                            }
+                        }
 
                     }
                 } else {
                     break;
                 }
                  
-                if (!src.hasRemaining()) join(src, progress);
+                if (!src.hasRemaining()) 
+                    if(insertionCursor==progress){insertionCursor=null;}else join(src, progress);
             }
         }
     }
@@ -112,7 +119,7 @@ public class Graph {
             insertionCursor.len = progress.pos - insertionCursor.pos;
             progress.nodes = insertionCursor.nodes;
             insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
-            return null;
+            return progress;
         } else {
             //create synthetic midpoint
             GraphNode synth = new GraphNode(insertionCursor.pos + splitPoint, insertionCursor.len - splitPoint, (byte) insertionCursor.type);
