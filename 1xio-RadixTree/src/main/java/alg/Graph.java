@@ -59,7 +59,7 @@ public class Graph {
             progress.len = 0;
 
 
-            while (progress.pos+progress.len<src.limit()) {
+            while (progress.pos + progress.len < src.limit()) {
 
                 boolean overflow = false;
                 boolean isWhite = false;
@@ -67,7 +67,7 @@ public class Graph {
                 boolean differ = false;
                 int direction = 0;
                 try {
-                    while (progress.pos+progress.len<src.limit()
+                    while (src.hasRemaining() && progress.pos + progress.len < src.limit()
                             && !(isWhite = ((inByte = src.get()) < MINA))
                             && active
                             && !(overflow = (progress.len >= insertionCursor.len))
@@ -75,12 +75,12 @@ public class Graph {
                         join(src, progress);
                     }
                 } catch (Exception e) {
-                    isWhite=true;
+//                    isWhite=true;
                 }
 
 
                 if (!isWhite) {
-                    if (direction== 0) {
+                    if (direction == 0) {
                         join(src, progress);
                     }
 
@@ -89,9 +89,9 @@ public class Graph {
                     } else {
                         if (active) {
                             insertionCursor = handleBifurcate(insertionCursor, progress, direction);
-                        
-                            if(insertionCursor==progress){
-                                insertionCursor=null;
+
+                            if (insertionCursor == progress) {
+                                insertionCursor = null;
                                 continue;
                             }
                         }
@@ -100,9 +100,11 @@ public class Graph {
                 } else {
                     break;
                 }
-                 
-                if (!src.hasRemaining()) 
-                    if(insertionCursor==progress){insertionCursor=null;}else join(src, progress);
+
+                if (!src.hasRemaining())
+                    if (insertionCursor == progress) {
+                        insertionCursor = null;
+                    } else join(src, progress);
             }
         }
     }
@@ -117,12 +119,17 @@ public class Graph {
 
 
         if (direction < 0) {
-            progress.pos = insertionCursor.pos + splitPoint;
-            progress.len = insertionCursor.len - splitPoint;
+            join    (src, progress);
+            //create synthetic midpoint
+            GraphNode synth = new GraphNode(insertionCursor.pos + splitPoint, insertionCursor.len - splitPoint, (byte) insertionCursor.type);
+            int prior = insertionCursor.len;
 
-            insertionCursor.len = progress.pos - insertionCursor.pos;
-            progress.nodes = insertionCursor.nodes;
-            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+            synth.nodes = insertionCursor.nodes;
+            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{  progress,synth,});
+            insertionCursor.len -= splitPoint;
+            insertionCursor.type = 0;
+            progress.pos += splitPoint;
+            progress.len -= prior - splitPoint;
             return progress;
         } else {
             //create synthetic midpoint
