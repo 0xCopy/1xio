@@ -4,7 +4,7 @@
   <groupId>hideftvads</groupId>
   <artifactId>1xio-parent</artifactId>
   <packaging>pom</packaging>
-  <version>0.0.5</version>
+  <version>0.0.6</version>
   <name>1xio-parent</name><description>1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for  RadixTree,server... </description>
   <url>http://code.google.com/p/1xio</url><scm><tag>HEAD</tag></scm>
   <dependencies>
