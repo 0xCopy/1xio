@@ -249,6 +249,6 @@ public class GraphTest extends TestCase {
         } catch (IOException e) {
             e.printStackTrace();  //TODO: Verify for a purpose
         }
-        System.out.print('\n');
+        System.out.print("\n\n");
     }
 }

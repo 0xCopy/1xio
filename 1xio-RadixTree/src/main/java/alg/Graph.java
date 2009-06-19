@@ -66,12 +66,16 @@ public class Graph {
                 final boolean active = insertionCursor != null;
                 boolean differ = false;
                 int direction = 0;
-                while (progress.pos+progress.len<src.limit()
-                        && !(isWhite = ((inByte = src.get()) < MINA))
-                        && active
-                        && !(overflow = (progress.len >= insertionCursor.len))
-                        && (0 == (direction = (inByte - (src.get(insertionCursor.pos + progress.len)))))) {
-                    join(src, progress);
+                try {
+                    while (progress.pos+progress.len<src.limit()
+                            && !(isWhite = ((inByte = src.get()) < MINA))
+                            && active
+                            && !(overflow = (progress.len >= insertionCursor.len))
+                            && (0 == (direction = (inByte - (src.get(insertionCursor.pos + progress.len)))))) {
+                        join(src, progress);
+                    }
+                } catch (Exception e) {
+                    isWhite=true;
                 }
 
 
