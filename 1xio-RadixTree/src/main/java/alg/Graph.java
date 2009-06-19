@@ -3,13 +3,17 @@ package alg;
 import java.io.*;
 import java.nio.*;
 import java.nio.charset.*;
+import java.text.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.text.*;
 
 
 /**
- * this is a key graph of src ByteBuffer input token indexes.  the Node is a Triple {position,length,type} pointing to the graph
+ * this is a key graph of src ByteBuffer input token indexes.
+ * <p/>
+ * the Node is a Triple {position,length,type} pointing to a span in a ByteBuffer backing store called 'src'
+ * <p/>
+ * as it turns out, for many of the same intentions, this design resembles the zlib 'deflate' lazy match strategy.
  * <p/>
  * User: jim
  * Date: Jun 7, 2009
@@ -120,13 +124,13 @@ public class Graph {
 
 
         if (direction < 0) {
-            join    (src, progress);
+            join(src, progress);
             //create synthetic midpoint
             GraphNode synth = new GraphNode(insertionCursor.pos + splitPoint, insertionCursor.len - splitPoint, (byte) insertionCursor.type);
             int prior = insertionCursor.len;
 
             synth.nodes = insertionCursor.nodes;
-            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{  progress,synth,});
+            insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress, synth,});
             insertionCursor.len -= splitPoint;
             insertionCursor.type = 0;
             progress.pos += splitPoint;
@@ -163,39 +167,18 @@ public class Graph {
             } else {
                 ix = -ix - 1;
                 ((CopyOnWriteArrayList) insertionCursor.nodes).add(ix, progress);
-                /*
-                final ReentrantLock lock = ((CopyOnWriteArrayList) insertionCursor.nodes).lock;
-                lock.lock();
-                try {
-                    Object[] elements = ((CopyOnWriteArrayList) insertionCursor.nodes).getArray();
-                    int len = elements.length;
-                    if (ix > len || ix < 0)
-                    throw new IndexOutOfBoundsException("Index: "+ ix +
-                                        ", Size: "+len);
-                    Object[] newElements;
-                    int numMoved = len - ix;
-                    if (numMoved == 0)
-                    newElements = Arrays.copyOf(elements, len + 1);
-                    else {
-                    newElements = new Object[len + 1];
-                    System.arraycopy(elements, 0, newElements, 0, ix);
-                    System.arraycopy(elements, ix, newElements, ix + 1,
-                             numMoved);
-                    }
-                    newElements[ix] = progress;
-                    ((CopyOnWriteArrayList) insertionCursor.nodes).setArray(newElements);
-                } finally {
-                    lock.unlock();
-                }
-                
-                 */
+/*
+                while (src.hasRemaining()&&
+                        src.get( ) >= MINA)progress.len++ ;
+                join(src, progress);*/
+                return null;
             }
 
         } else {
             insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
             return null;
         }
-        return insertionCursor;
+//        return insertionCursor;
     }
 
     String reify(final GraphNode progress) {
@@ -239,7 +222,7 @@ public class Graph {
         } else {
             parent.nodes.add(progress);
             //noinspection unchecked
-            Arrays.sort(parent.nodes.toArray(), (Comparator) comparator);
+            Arrays.sort(parent.nodes.toArray(), (Comparator ) comparator);
         }
     }
 
@@ -255,16 +238,17 @@ public class Graph {
             int l = 0;
             int c = 0;
             final int i = Math.min(o1.len, o2.len);
-            try {
-                while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
-                    l++;
-                    if (l > i) {
-                        return o1.len - o2.len;
-                    }
+//            try {
+            while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
+                l++;
+                if (l > i) {
+                    return o1.len - o2.len;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
             }
+//            } catch (Exception e) {
+//                e.printStackTrace();  //TODO: Verify for a purpose
+//            }
+            assert (c != 0);
             return c;
         }
     }
@@ -279,8 +263,7 @@ public class Graph {
         List<GraphNode> nodes;
 
 
-        public GraphNode(final int pos, int len, int type
-        ) {
+        public GraphNode(final int pos, int len, int type) {
             this.pos = pos;
             this.len = len;
             this.type = type;
@@ -294,7 +277,7 @@ public class Graph {
 
         @Override
         public String toString() {
-            return MessageFormat.format("{0,number,###}:{1,number,###}", pos, len);
+            return MessageFormat.format("{0}:{1}", pos, len);
         }
 
         public GraphNode get(int i) {

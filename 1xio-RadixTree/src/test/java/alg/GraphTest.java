@@ -213,23 +213,22 @@ public class GraphTest extends TestCase {
     }
 
     public void testUnOrderedSiblingInsertion() {
-        Graph graph = new Graph(UTF8.encode("a apple anvils"));
+        Graph graph = new Graph(UTF8.encode("a accc ab acccc ab addddddddd"));
         z(graph);
         assertEquals(1, graph.root.nodes.size());
-        final Graph.GraphNode aNode = graph.root.nodes.get(0);
-        assertEquals(0, aNode.pos);
-        assertEquals(1, aNode.len);
+        final Graph.GraphNode a = graph.root.nodes.get(0);
+        assertEquals(0, a.pos);
+        assertEquals(1, a.len);
+        assertEquals(3, a.nodes.size());
+/* 
+        0:0
+         0:1:a
+          8:1:b
+          3:3:ccc
+           14:1:c
+          20:9:ddddddddd
+                  */
 
-
-        assertEquals(1, graph.root.nodes.size());
-        final Graph.GraphNode nvilNode = aNode.nodes.get(0);
-        assertEquals(9, nvilNode.pos);
-        assertEquals(5, nvilNode.len);
-
-        assertEquals(1, graph.root.nodes.size());
-        final Graph.GraphNode ppleNode = aNode.nodes.get(1);
-        assertEquals(4, ppleNode.pos);
-        assertEquals(4, ppleNode.len);
 
     }
 
