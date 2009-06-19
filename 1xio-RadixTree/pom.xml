@@ -5,7 +5,7 @@
     <parent>
         <artifactId>1xio-parent</artifactId>
         <groupId>hideftvads</groupId>
-        <version>0.0.5</version>
+        <version>0.0.6</version>
     </parent>
     <name>RadixTree</name>
     <version>0.0.5</version>
