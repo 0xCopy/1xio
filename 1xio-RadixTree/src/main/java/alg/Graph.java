@@ -5,6 +5,7 @@ import java.nio.*;
 import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.text.*;
 
 
 /**
@@ -293,10 +294,7 @@ public class Graph {
 
         @Override
         public String toString() {
-            return "GraphNode{" +
-                    "len=" + len +
-                    ", pos=" + pos +
-                    '}';
+            return MessageFormat.format("{0,number,###}:{1,number,###}", pos, len);
         }
 
         public GraphNode get(int i) {
