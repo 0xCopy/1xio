@@ -8,7 +8,7 @@
         <version>0.0.6</version>
     </parent>
     <name>RadixTree</name>
-    <version>0.0.5</version>
+    <!--<version>0.0.5</version>-->
     <groupId>hideftvads</groupId>
     <artifactId>1xio-RadixTree</artifactId>
     <description>RadixTree of 1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for

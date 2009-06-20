@@ -29,6 +29,7 @@ public class Graph {
     private static final Charset UTF8 = Charset.forName("UTF8");
     private static final Charset CHARSET = UTF8;
     public final Comparator<GraphNode> comparator;
+    private GraphNode reclaim;
 
 
     public Graph(final ByteBuffer src) {
@@ -48,68 +49,83 @@ public class Graph {
      * nodes are stored in sorted arrays based on indirect bytes described by (pos,len) pairs.
      */
     public void create() {
-        final ByteBuffer src = this.src.duplicate();
-        newNode:
-        while (src.hasRemaining()) {
+        GraphNode progress = null;
+        try {
+            final ByteBuffer src = this.src.duplicate();
+            progress = root;
+            newNode:
+            while (src.hasRemaining()) {
 
-            final int tokenStart = src.position();
-            final GraphNode progress = new GraphNode(tokenStart, 0, TYPE_DATA);
-            byte inByte = 0;
+                final int tokenStart = src.position();
+                progress = new GraphNode(tokenStart, 0, TYPE_DATA);
+                byte inByte = 0;
 
-            GraphNode insertionCursor = null;
+                GraphNode insertionCursor = null;
 
-            progress.len = 1;
-            insertionCursor = handleOverflow(src, root, progress);
-            progress.pos = tokenStart;
-            progress.len = 0;
+                progress.len = 1;
+                insertionCursor = handleOverflow(src, root, progress);
+                progress.pos = tokenStart;
+                progress.len = 0;
 
 
-            while (progress.pos + progress.len < src.limit()) {
+                while (progress.pos + progress.len < src.limit()) {
 
-                boolean overflow = false;
-                boolean isWhite = false;
-                final boolean active = insertionCursor != null;
-                boolean differ = false;
-                int direction = 0;
-                try {
-                    while (src.hasRemaining() && progress.pos + progress.len < src.limit()
-                            && !(isWhite = ((inByte = src.get()) < MINA))
-                            && active
-                            && !(overflow = (progress.len >= insertionCursor.len))
-                            && (0 == (direction = (inByte - (src.get(insertionCursor.pos + progress.len)))))) {
-                        join(src, progress);
-                    }
-                } catch (Exception e) {
+                    boolean overflow = false;
+                    boolean isWhite = false;
+                    final boolean active = insertionCursor != null;
+                    boolean differ = false;
+                    int direction = 0;
+                    try {
+                        while (src.hasRemaining() && progress.pos + progress.len < src.limit()
+                                && !(isWhite = ((inByte = src.get()) < MINA))
+                                && active
+                                && !(overflow = (progress.len >= insertionCursor.len))
+                                && (0 == (direction = (inByte - (src.get(insertionCursor.pos + progress.len)))))) {
+                            join(src, progress);
+                        }
+                    } catch (Exception e) {
 //                    isWhite=true;
-                }
-
-
-                if (!isWhite) {
-                    if (direction == 0) {
-                        join(src, progress);
                     }
 
-                    if (overflow || (active && progress.len > insertionCursor.len)) {
-                        insertionCursor = handleOverflow(src, insertionCursor, progress);
-                    } else {
-                        if (active) {
-                            insertionCursor = handleBifurcate(insertionCursor, progress, direction);
 
-                            if (insertionCursor == progress) {
-                                insertionCursor = null;
-                                continue;
-                            }
+                    if (!isWhite) {
+                        if (direction == 0) {
+                            join(src, progress);
                         }
 
-                    }
-                } else {
-                    break;
-                }
+                        if (overflow || (active && progress.len > insertionCursor.len)) {
+                            insertionCursor = handleOverflow(src, insertionCursor, progress);
+                        } else {
+                            if (active) {
+                                insertionCursor = handleBifurcate(insertionCursor, progress, direction);
 
-                if (!src.hasRemaining())
-                    if (insertionCursor == progress) {
-                        insertionCursor = null;
-                    } else join(src, progress);
+                                if (insertionCursor == progress) {
+                                    insertionCursor = null;
+                                    continue;
+                                }
+                            }
+
+                        }
+                    } else {
+                        break;
+                    }
+
+                    if (!src.hasRemaining())
+                        if (insertionCursor == progress) {
+                            insertionCursor = null;
+                        } else join(src, progress);
+                }
+            }
+        } finally {
+            if (progress.len == 0) {
+                if (reclaim != null)
+                    for (GraphNode node : reclaim.nodes) {
+                        if (node.len == 0) {
+                            reclaim.nodes.remove(node);     reclaim.type|=1;
+                            reclaim = null;
+                            progress = null;
+                        }
+                    }
             }
         }
     }
@@ -135,6 +151,7 @@ public class Graph {
             insertionCursor.type = 0;
             progress.pos += splitPoint;
             progress.len -= prior - splitPoint;
+            reclaim = insertionCursor;
             return progress;
         } else {
             //create synthetic midpoint
@@ -147,6 +164,7 @@ public class Graph {
             insertionCursor.type = 0;
             progress.pos += splitPoint;
             progress.len -= prior - splitPoint;
+        reclaim=insertionCursor;
             return null;
         }
 //        return null;
@@ -162,20 +180,17 @@ public class Graph {
             int ix = Arrays.binarySearch(graphNodes, progress, comparator);
 
             if (ix >= 0) {
-                final GraphNode olderNode = insertionCursor.get(ix);
-                return insertionCursor = olderNode;
+                reclaim = insertionCursor.get(ix);
+                return insertionCursor = reclaim;
             } else {
                 ix = -ix - 1;
                 ((CopyOnWriteArrayList) insertionCursor.nodes).add(ix, progress);
-/*
-                while (src.hasRemaining()&&
-                        src.get( ) >= MINA)progress.len++ ;
-                join(src, progress);*/
                 return null;
             }
 
         } else {
             insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
+            reclaim = insertionCursor;
             return null;
         }
 //        return insertionCursor;
@@ -193,6 +208,7 @@ public class Graph {
         final CharBuffer buffer = CHARSET.decode(buffer1);
 
         return buffer.toString();
+        
     }
 
 
@@ -222,7 +238,7 @@ public class Graph {
         } else {
             parent.nodes.add(progress);
             //noinspection unchecked
-            Arrays.sort(parent.nodes.toArray(), (Comparator ) comparator);
+            Arrays.sort(parent.nodes.toArray(), (Comparator) comparator);
         }
     }
 
