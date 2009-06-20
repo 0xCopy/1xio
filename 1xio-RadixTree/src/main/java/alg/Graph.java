@@ -181,13 +181,16 @@ public class Graph {
 
             if (ix >= 0) {
                 reclaim = insertionCursor.get(ix);
-                return insertionCursor = reclaim;
+                return    reclaim;
             } else {
                 ix = -ix - 1;
-                ((CopyOnWriteArrayList) insertionCursor.nodes).add(ix, progress);
-                return null;
+                try {
+                    reclaim = insertionCursor.get(ix);
+                    return    reclaim;
+                } catch (Exception e) {
+                    insertionCursor.nodes.add(ix,progress);    return null;
+                }
             }
-
         } else {
             insertionCursor.nodes = new CopyOnWriteArrayList<GraphNode>(new GraphNode[]{progress});
             reclaim = insertionCursor;
