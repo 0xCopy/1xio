@@ -254,18 +254,13 @@ public class Graph {
             int l = 0;
             int c = 0;
             final int i = Math.min(o1.len, o2.len);
-//            try {
-            while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
+             while (l < i && (0) == (c = src.get(o1.pos + l) - src.get(o2.pos + l))) {
                 l++;
-                if (l > i) {
+                if (l == i) {
                     return o1.len - o2.len;
                 }
             }
-//            } catch (Exception e) {
-//                e.printStackTrace();  //TODO: Verify for a purpose
-//            }
-            assert (c != 0);
-            return c;
+             return c;
         }
     }
 
