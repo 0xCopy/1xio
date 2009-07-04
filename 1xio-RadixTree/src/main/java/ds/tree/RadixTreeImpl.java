@@ -53,8 +53,7 @@ public class RadixTreeImpl<T> extends Pair<RadixTreeNode<T>, AtomicLong> impleme
     @SuppressWarnings("unchecked")
     public T find(final Text key) {
         final Visitor<T> visitor = new Visitor<T>() {
-
-            T result = null;
+            T result = null;                
 
             public void visit(final Text key, final RadixTreeNode<T> parent,
                               final RadixTreeNode<T> node) {

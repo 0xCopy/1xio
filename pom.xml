@@ -18,5 +18,6 @@
   <modules>
     <module>1xio-RadixTree</module>
     <module>1xio-server</module>
+    <module>1xio-android</module>
   </modules>
 </project>

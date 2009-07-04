@@ -16,9 +16,9 @@
     </organization>
   <description>server of 1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for  RadixTree,server... </description>
   <url>http://code.google.com/p/1xio</url>
-  <scm>
-    <tag>HEAD</tag>
-  </scm>
+  <!--<scm>-->
+    <!--<tag>HEAD</tag>-->
+  <!--</scm>-->
     <build>
         <plugins>
             <plugin>
