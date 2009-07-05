@@ -9,13 +9,13 @@ import android.test.ActivityInstrumentationTestCase;
  * <p/>
  * To run this test, you can type:
  * adb shell am instrument -w \
- * -e class hideftvads.android.AgentTest \
+ * -e class hideftvads.android.ServeTest \
  * hideftvads.android.tests/android.test.InstrumentationTestRunner
  */
-public class AgentTest extends ActivityInstrumentationTestCase<Agent> {
+public class ServeTest extends ActivityInstrumentationTestCase<Serve> {
 
-    public AgentTest() {
-        super("hideftvads.android", Agent.class);
+    public ServeTest() {
+        super("hideftvads.android", Serve.class);
     }
 
 }

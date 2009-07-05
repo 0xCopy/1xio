@@ -17,5 +17,5 @@
     -->
     <instrumentation android:name="android.test.InstrumentationTestRunner"
                      android:targetPackage="hideftvads.android"
-                     android:label="Tests for Agent"/>
+                     android:label="Tests for Serve"/>
 </manifest>
