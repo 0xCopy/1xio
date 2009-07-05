@@ -1,23 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>hideftvads</groupId>
-  <artifactId>1xio-parent</artifactId>
-  <packaging>pom</packaging>
-  <version>0.0.6</version>
-  <name>1xio-parent</name><description>1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for  RadixTree,server... </description>
-  <url>http://code.google.com/p/1xio</url><scm><tag>HEAD</tag></scm>
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-       <artifactId>junit</artifactId>
-      <version>4.4</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-  <modules>
-    <module>1xio-RadixTree</module>
-    <module>1xio-server</module>
-    <module>1xio-android</module>
-  </modules>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>hideftvads</groupId>
+    <artifactId>1xio-parent</artifactId>
+    <packaging>pom</packaging>
+    <version>0.0.6</version>
+    <name>1xio-parent</name>
+    <description>1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for
+        RadixTree,server...
+    </description>
+    <url>http://code.google.com/p/1xio</url>
+    <scm>
+        <tag>HEAD</tag>
+    </scm>
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.4</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <modules>
+        <module>1xio-RadixTree</module>
+        <module>1xio-server</module>
+        <module>1xio-android</module>
+    </modules>
+    <build>
+        <plugins>
+            <!--<plugin>-->
+                <!--<groupId>org.codehaus.mojo</groupId>-->
+                <!--<artifactId>retrotranslator-maven-plugin</artifactId>-->
+                <!--<version>1.0-beta-1-SNAPSHOT</version>-->
+                <!--<executions>-->
+                    <!--<execution>-->
+                        <!--<goals>-->
+                            <!--<goal>translate-project</goal>-->
+                        <!--</goals>-->
+                    <!--</execution>-->
+                <!--</executions>-->
+                <!--<configuration>-->
+                    <!--<classifier>jdk14</classifier>-->
+                    <!--<attach>false</attach>-->
+                <!--</configuration>-->
+            <!--</plugin>-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.5</source>
+                    <target>1.5</target>
+                    <fork>true</fork>
+                    <meminitial>1024m</meminitial>
+                    <maxmem>2048m</maxmem>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

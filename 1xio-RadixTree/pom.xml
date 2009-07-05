@@ -45,7 +45,23 @@
         </dependency>
     </dependencies>
     <build>
-        <plugins>
+        <plugins>                <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>retrotranslator-maven-plugin</artifactId>
+                <version>1.0-beta-1-SNAPSHOT</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>translate-project</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <classifier>jdk13</classifier>
+                    <attach>false</attach>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -53,8 +69,7 @@
                     <source>1.5</source>
                     <target>1.5</target>
                     <fork>true</fork>
-                    <meminitial>1024m</meminitial>
-                    <maxmem>1024m</maxmem>
+                    <maxmem>2048m</maxmem>
                 </configuration>
             </plugin>
         </plugins>

@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project>
-  <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <artifactId>1xio-parent</artifactId>
-    <groupId>hideftvads</groupId>
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>1xio-parent</artifactId>
+        <groupId>hideftvads</groupId>
+        <version>0.0.6</version>
+    </parent>
     <version>0.0.6</version>
-  </parent>                                                                                                  
-  <groupId>hideftvads</groupId>
-  <artifactId>1xio-android</artifactId>
-  <name>1xio-android</name>
-  <url>http://maven.apache.org</url>
+    <groupId>hideftvads</groupId>
+    <artifactId>1xio-android</artifactId>
+    <name>1xio-android</name>
+    <url>http://maven.apache.org</url>
     <packaging>apk</packaging>
- 
+
     <prerequisites>
         <maven>2.0.9</maven>
     </prerequisites>
@@ -31,12 +32,23 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>hideftvads</groupId>
-            <artifactId>1xio-server</artifactId>
-            <version>${parent.version}</version>
+            <groupId>javolution</groupId>
+            <artifactId>javolution</artifactId>
+            <version>5.3.1</version>
+            <!--<scope>test</scope>-->
         </dependency>
+        <dependency>
+            <groupId>com.thoughtworks.xstream</groupId>
+            <artifactId>xstream</artifactId>
+            <version>1.3.1</version>    <scope>test</scope>
+        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>hideftvads</groupId>-->
+            <!--<artifactId>1xio-server</artifactId>-->
+            <!--<version>0.0.6</version>-->
+        <!--</dependency>-->
     </dependencies>
-    
+
     <build>
         <!--<finalName>${artifactId}</finalName>-->
         <plugins>
@@ -45,8 +57,9 @@
                 <artifactId>maven-android-plugin</artifactId>
                 <version>2.0.0-alpha7</version>
                 <configuration>
-                    <sdk>   <path>/Users/jim/Library/android-sdk-mac_x86-1.5_r2/</path>
-                     
+                    <sdk>
+                        <path>/Users/jim/Library/android-sdk-mac_x86-1.5_r2/</path>
+
                         <!--<path>${env.ANDROID_SDK_15}</path>-->
                         <platform>1.5</platform>
                     </sdk>
@@ -56,23 +69,28 @@
             </plugin>
 
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <source>1.5</source>
                     <target>1.5</target>
+                    <fork>true</fork>
+                    <!--<meminitial>1024m</meminitial>-->
+                    <maxmem>2048m</maxmem>
                 </configuration>
             </plugin>
+
 
         </plugins>
     </build>
 
     <pluginRepositories>
-       <pluginRepository>
-         <id>maven-android-plugin-m2repo.googlecode.com</id>
-         <name>Maven Android Plugin Release Repository</name>
-         <url>http://maven-android-plugin-m2repo.googlecode.com/svn/release</url>
-       </pluginRepository>
-   </pluginRepositories>
+        <pluginRepository>
+            <id>maven-android-plugin-m2repo.googlecode.com</id>
+            <name>Maven Android Plugin Release Repository</name>
+            <url>http://maven-android-plugin-m2repo.googlecode.com/svn/release</url>
+        </pluginRepository>
+    </pluginRepositories>
 
 
 </project>
