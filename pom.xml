@@ -18,5 +18,21 @@
   <modules>
     <module>1xio-RadixTree</module>
     <module>1xio-server</module>
-  </modules>
+  </modules>   
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                    <fork>true</fork>
+                    <meminitial>1024m</meminitial>
+                    <maxmem>1024m</maxmem>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

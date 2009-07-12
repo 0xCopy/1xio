@@ -18,7 +18,7 @@ public enum HttpHeaders {
     ;
 
     final CharBuffer header = CharBuffer.wrap(URLDecoder.decode(name().replace('$', '%')));
-    final ByteBuffer token = HttpMethod.UTF8.encode(header);
+    final ByteBuffer token = ProtoUtil.UTF8.encode(header);
     final int tokenLen = token.limit();
 
     boolean recognize(ByteBuffer buffer) {

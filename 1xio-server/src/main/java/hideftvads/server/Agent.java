@@ -5,6 +5,7 @@ import alg.Pair;
 import ds.tree.RadixTree;
 import ds.tree.RadixTreeImpl;
 import hideftvads.proto.HttpMethod;
+import static hideftvads.proto.ProtoUtil.threadPool;
 import javolution.text.Text;
 
 import java.io.IOException;
@@ -106,7 +107,7 @@ public class Agent {
             }
         };
 
-        HttpMethod.threadPool.submit(runnable);
+        threadPool.submit(runnable);
     }
 
     static public void main(String... a) throws IOException {

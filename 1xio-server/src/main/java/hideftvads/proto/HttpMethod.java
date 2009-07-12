@@ -1,31 +1,20 @@
 package hideftvads.proto;
 
-import alg.Pair;
-import alg.Tuple;
-import ds.tree.DuplicateKeyException;
-import ds.tree.RadixTree;
-import ds.tree.RadixTreeImpl;
+import alg.*;
+import ds.tree.*;
+import static hideftvads.proto.ProtoUtil.*;
 import static hideftvads.proto.HttpStatus.*;
-import javolution.text.Text;
+import javolution.text.*;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import static java.lang.Character.isWhitespace;
-import java.lang.ref.Reference;
-import java.lang.ref.SoftReference;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
+import java.io.*;
+import static java.lang.Character.*;
+import java.lang.ref.*;
+import java.net.*;
+import java.nio.*;
 import java.nio.channels.*;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
+import java.nio.charset.*;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -142,7 +131,7 @@ public enum HttpMethod {
                             final SocketChannel channel = (SocketChannel) key.channel();
                             final Xfer xfer = new Xfer(fc, path);
                             response(key, $200);
-                            final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
+                            final Reference<ByteBuffer> byteBufferReference =  borrowBuffer(DEFAULT_EXP);
                             try {
                                 final ByteBuffer buffer1 = byteBufferReference.get();
                                 MimeType mimeType = null;
@@ -351,7 +340,7 @@ public enum HttpMethod {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
+                    byteBufferReference =  borrowBuffer(DEFAULT_EXP);
                     try {
                         final ByteBuffer buffer = byteBufferReference.get();
                         final int i = channel.read(buffer);
@@ -387,63 +376,14 @@ public enum HttpMethod {
         }
 
     },;
-
-    private static CharBuffer extractUri(ByteBuffer src, LinkedList<Pair<Integer, LinkedList<Integer>>> lines) {
-        final Integer seek = lines.getFirst().$2().get(1) + 1;
-        int limit = lines.getFirst().$2().get(2) - 1;
-        src.limit(limit).position(seek);
-        final CharBuffer buffer = UTF8.decode(src);
-        return buffer;
-    }
+//    private static int DEFAULT_EXP= DEFAULT_EXP;
 
     private static final String HTTP_PREFIX = "http://".intern();
 
-    private static LinkedList<Pair<Integer, LinkedList<Integer>>> preIndex(ByteBuffer src) {
-        LinkedList<Pair<Integer, LinkedList<Integer>>> lines = new LinkedList<Pair<Integer, LinkedList<Integer>>>();
-        final int pos = src.position();
-        lines.add(new Pair<Integer, LinkedList<Integer>>(pos, new LinkedList<Integer>()));
-
-        byte prev = 0;
-
-        L1:
-
-
-        while (src.hasRemaining()) {
-            byte b = src.get();
-
-            switch (b) {
-                case EOL:
-                    if (prev == EOL) {
-                        break L1;
-                    }
-                    lines.add(new Pair<Integer, LinkedList<Integer>>(src.position(), new LinkedList<Integer>()));
-
-
-                    break;
-                case '\r':
-                default:
-                    if (!isWhitespace(b) && '\r' != b || isWhitespace(prev)) {
-                    } else {
-                        lines.getLast().$2().add(src.position());
-                    }
-                    break;
-            }
-            prev = b;
-        }
-        return lines;
-    }
-
-    private static final int EOL = '\n' & 0xff;
-
-
-    private static final int DEFAULT_EXP = 0;
     final ByteBuffer token = (ByteBuffer) ByteBuffer.wrap(name().getBytes()).rewind().mark();
 
 
     final int margin = name().length() + 1;
-    static final Charset UTF8 = Charset.forName("UTF8");
-    private static final byte[] FIREFOX_ENDLINE = new byte[]{'\r', '\n',
-            0};
 
 
     /**
@@ -577,7 +517,7 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final Reference<ByteBuffer> byteBufferReference = HttpMethod.borrowBuffer(DEFAULT_EXP);
+        final Reference<ByteBuffer> byteBufferReference =  borrowBuffer(DEFAULT_EXP);
         try {
             final ByteBuffer buffer = byteBufferReference.get();
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append('\n').flip();
@@ -602,100 +542,11 @@ public enum HttpMethod {
     final static CharsetDecoder decoder = charset.newDecoder();
 
 
-    public static ExecutorService threadPool = Executors.newCachedThreadPool();
-    public static final int CHUNKDEFAULT = 4;
-    public static final int CHUNK_NUM = 128;
-    public static final int KBYTE = 1024;
-    private static final int MAX_EXP = 16;
 
 
     public void onAccept(SelectionKey key) {
         throw new UnsupportedOperationException();
     }
-
-
-    static Reference<ByteBuffer> borrowBuffer(int... exp) {
-
-        final int slot = exp.length == 0
-                ? DEFAULT_EXP
-                : exp[0];
-
-        if (exp.length > 1)
-            System.out.println("heap " + slot + " count " + counter[slot]);
-
-
-        final Queue<Reference<ByteBuffer>> buffer = buffers[slot];
-        Reference<ByteBuffer> o;
-
-
-        if (buffer.isEmpty()) {
-            refill(slot);
-            o = borrowBuffer(slot, counter[slot]++);
-        } else {
-            o = buffer.remove();
-        }
-        minus();
-        return o.get() == null ? borrowBuffer(exp) : o;
-    }
-
-    private static void minus() {
-        //System.out.write('-');
-    }
-
-
-    static synchronized private void refill(final int slot) {
-        Queue<Reference<ByteBuffer>> queue = buffers[slot];
-        if (queue == null) {
-            queue = buffers[slot] = new ConcurrentLinkedQueue<Reference<ByteBuffer>>();
-        }
-
-        if (queue.isEmpty()) {
-
-            final int czize = KBYTE << slot;
-            final ByteBuffer buffer = ByteBuffer.allocateDirect(czize * CHUNK_NUM);
-
-            for (int i = 0; i < CHUNK_NUM; i++) {
-                final int i2 = buffer.position();
-                final int newPosition = i2 + czize;
-
-                buffer.limit(newPosition);
-
-                queue.add(new SoftReference<ByteBuffer>(buffer.slice()));
-                plus();
-                buffer.position(newPosition);
-            }
-            //  System.out.flush();
-        }
-
-    }
-
-    final
-    private static Queue<Reference<ByteBuffer>>[] buffers = (Queue<Reference<ByteBuffer>>[]) new Queue<?>[MAX_EXP];
-
-    static {
-        for (int i = 0; i < buffers.length; i++)
-            buffers[i] = new ConcurrentLinkedQueue<Reference<ByteBuffer>>();
-
-
-    }
-
-    //    static int counter[]=new int[MAX_EXP];
-
-    static void recycle(Reference<ByteBuffer> byteBufferReference, int shift) {
-        final ByteBuffer buffer = byteBufferReference.get();
-        if (buffer != null) {
-            buffer.clear();
-            buffers[shift].add(byteBufferReference);
-            plus();
-        }
-    }
-
-    private static void plus() {
-//        System.out.write('+');
-    }
-
-
-    private static int[] counter = new int[MAX_EXP];
 
     private static class Rfc822Key implements Callable<Text> {
         private final ByteBuffer src;
@@ -755,3 +606,5 @@ public enum HttpMethod {
         }
     }
 };
+
+
