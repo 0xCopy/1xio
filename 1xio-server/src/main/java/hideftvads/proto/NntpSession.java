@@ -6,7 +6,6 @@ import java.io.*;
 import java.nio.*;
 import java.nio.channels.*;
 import java.util.*;
-import java.util.concurrent.*;
 
 /**
  * User: jim
@@ -33,7 +32,8 @@ public class NntpSession {
     public FileChannel bodyChannel;
     public RandomAccessFile bodyFile;
     public long bodyCursor;
-    public CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>> bodyLines;
+    public LinkedList<Pair<Integer, LinkedList<Integer>>> bodyLines;
     public ByteBuffer BODY;
     public String outputName;
+    public File bodyTmpFile;
 }
