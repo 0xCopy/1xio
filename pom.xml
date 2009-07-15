@@ -16,6 +16,7 @@
     </dependency>
   </dependencies>
   <modules>
+    <module>1xio-base64</module>
     <module>1xio-RadixTree</module>
     <module>1xio-yence</module>
     <module>1xio-server</module>

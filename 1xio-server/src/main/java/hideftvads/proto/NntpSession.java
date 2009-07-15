@@ -16,8 +16,13 @@ import java.util.concurrent.*;
 public class NntpSession {
     public NntpClientLifeCycle lifecyle = NntpClientLifeCycle.exec;
 
-    public String AUTHINFO$20USER = "jimn235";
-    public String AUTHINFO$20PASS = "xxxx";
+  /*  
+    {
+        final Map<String, String> map = System.getenv();
+        System.err.println(""+String.valueOf( map) );
+    }*/
+    public String AUTHINFO$20USER = System.getenv("NNTP_USER");
+    public String AUTHINFO$20PASS = System.getenv("NNTP_PASS");
     public String ID = "<letp55tti95uavt6nekt606mgv8ikbfusb@4ax.com>";
     public ByteBuffer LIST;
     public int gcursor;
@@ -25,10 +30,10 @@ public class NntpSession {
     public RandomAccessFile gfile;
     public List<Pair<Integer, LinkedList<Integer>>> groupList;
     ;
-    public FileChannel bchannel;
-    public RandomAccessFile bfile;
-    public long bcursor;
-    public CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>> bLines;
+    public FileChannel bodyChannel;
+    public RandomAccessFile bodyFile;
+    public long bodyCursor;
+    public CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>> bodyLines;
     public ByteBuffer BODY;
-    public String fname;
+    public String outputName;
 }

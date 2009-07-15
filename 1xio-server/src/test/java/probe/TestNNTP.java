@@ -33,7 +33,7 @@ public class TestNNTP extends TestCase {
 
             c.configureBlocking(false);
             c.register(SELECTOR, OP_CONNECT, new NntpSession());
-            c.connect(new InetSocketAddress("news.easynews.com", 119));
+            c.connect(new InetSocketAddress(System.getenv("NNTP_SERVER"), Integer.valueOf(System.getenv("NNTP_PORT"))));
 
             Runnable runnable = new Runnable() {
                 public void run() {

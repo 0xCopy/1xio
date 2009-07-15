@@ -1,6 +1,7 @@
 package hideftvads.proto;
 
 import alg.*;
+import sun.misc.*;
 
 import java.io.*;
 import java.lang.ref.*;
@@ -228,8 +229,8 @@ public enum NntpClientLifeCycle {
                 RandomAccessFile randomAccessFile;
                 if (x.LIST != null) {
                     buffer = x.LIST;
-                    channel = x.bchannel;
-                    randomAccessFile = x.bfile;
+                    channel = x.bodyChannel;
+                    randomAccessFile = x.bodyFile;
 
                 } else {
                     final File tempFile = File.createTempFile("1xio", ".body");
@@ -242,15 +243,15 @@ public enum NntpClientLifeCycle {
 
                     channel = randomAccessFile.getChannel();
                     buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, BLEN);
-                    x.bfile = randomAccessFile;
-                    x.bchannel = channel;
+                    x.bodyFile = randomAccessFile;
+                    x.bodyChannel = channel;
                     x.LIST = buffer;
                 }
                 long l = 0;
-                x.bcursor += l = channel.transferFrom((ReadableByteChannel) k.channel(), x.bcursor, BLEN - x.bcursor);
+                x.bodyCursor += l = channel.transferFrom((ReadableByteChannel) k.channel(), x.bodyCursor, BLEN - x.bodyCursor);
 
                 if (l > 0) {
-                    final int ci = (int) x.bcursor;
+                    final int ci = (int) x.bodyCursor;
                     if (ci % 50 == 0)
                         System.err.println("read " + l + "@" + ci + ":" + buffer.get(ci - 4)
                                 + ":" + buffer.get(ci - 3)
@@ -260,35 +261,37 @@ public enum NntpClientLifeCycle {
                         );
                 }
                 if (
-                        buffer.get((int) (x.bcursor - 4)) == '\n' &&
-                                buffer.get((int) (x.bcursor - 3)) == '.' &&
-                                buffer.get((int) (x.bcursor - 2)) == '\r' &&
-                                buffer.get((int) (x.bcursor - 1)) == '\n'
+                        buffer.get((int) (x.bodyCursor - 4)) == '\n' &&
+                                buffer.get((int) (x.bodyCursor - 3)) == '.' &&
+                                buffer.get((int) (x.bodyCursor - 2)) == '\r' &&
+                                buffer.get((int) (x.bodyCursor - 1)) == '\n'
                         ) {
                     try {
-                        buffer = null;
-                        x.bfile.setLength(x.bcursor);
-                        x.BODY = x.bchannel.map(FileChannel.MapMode.PRIVATE, 0, x.bcursor);
+                       
+                        x.bodyFile.setLength(x.bodyCursor);
+                      buffer=  x.BODY = x.bodyChannel.map(FileChannel.MapMode.PRIVATE, 0, x.bodyCursor);
                         setLifecycle(k, SelectionKey.OP_READ, exec);
-                        System.err.println("total " + x.bcursor);
+                        System.err.println("total " + x.bodyCursor);
                         //
                         final LinkedList<Pair<Integer, LinkedList<Integer>>> list = ProtoUtil.preIndex(x.BODY);
 
-                        x.bLines = new CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>>(list.toArray(new Pair[0]));
+                        x.bodyLines = new CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>>(list.toArray(new Pair[0]));
                     } catch (IOException e) {
                         e.printStackTrace();  //TODO: Verify for a purpose
                     }
 
 
-//                System.err.println(Arrays.toString(x.bLines.toArray()));
+//                System.err.println(Arrays.toString(x.bodyLines.toArray()));
                     x.BODY.clear();
                     boolean trigger = false;
-                    for (Pair<Integer, LinkedList<Integer>> bLine : x.bLines) {
+                    for (Pair<Integer, LinkedList<Integer>> bLine : x.bodyLines) {
 
                         if (trigger) {
                             x.BODY.clear();
+/*
                             x.BODY.position(bLine.$1());
                             x.BODY.compact();
+*/
                             break;
 
                         } else {
@@ -306,8 +309,8 @@ public enum NntpClientLifeCycle {
                                     try {
                                         x.BODY.limit(bLine.$2().get(2)-1).position(bLine.$2().get(1));
 
-                                        x.fname = ProtoUtil.UTF8.decode(x.BODY).toString();
-                                        System.err.println("fname " + x.fname);
+                                        x.outputName = ProtoUtil.UTF8.decode(x.BODY).toString();
+                                        System.err.println("outputName " + x.outputName);
                                     } catch (Exception e) {
                                         e.printStackTrace();  //TODO: Verify for a purpose
                                     }
@@ -317,7 +320,7 @@ public enum NntpClientLifeCycle {
                     }
                     if (trigger) {
 
-                        final Integer integer = x.bLines.get(x.bLines.size() - 2).$1();
+                        final Integer integer = x.bodyLines.get(x.bodyLines.size() - 2).$1();
                         final CharBuffer charBuffer = ProtoUtil.UTF8.decode(((ByteBuffer) x.BODY.position(integer)));
                         System.err.println("last  " + integer + "  " + charBuffer);
                         final byte[] bytes;
@@ -326,17 +329,17 @@ public enum NntpClientLifeCycle {
                             final boolean b = x.BODY.hasArray();
                             final byte[] bytes1 = b ? x.BODY.array() : new byte[x.BODY.limit()];
                             if (!b) x.BODY.get(bytes1);
-                            bytes = Base64.decodeFast(bytes1);
+                            bytes = Base64.decode (bytes1);
                         } finally {
                         }
                         final int length = bytes.length;
                         System.err.println("decoded " + length);
                         if (length > 0) {
-                            final FileOutputStream file = new FileOutputStream(x.fname);
+                            final FileOutputStream file = new FileOutputStream(x.outputName);
                             file.write(bytes);
                             file.close();
 
-                        }
+                        }                     
                     }
                     return;
                 }
@@ -435,3 +438,4 @@ public enum NntpClientLifeCycle {
         return false;
     }
 }
+

@@ -1,0 +1,45 @@
+<html>
+<head>
+<title>Base64 - Project Home Page</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+</head>
+<h1>Base-64 and Hex codecs in the form of Character encodings.</h1>
+<body bgcolor="#FFFFFF" text="#000000">
+<p>The inspiration for this comes from the RFE <a
+ href="http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4235519">4235519</a>
+ which request proper access to Base-64 encoding and decoding as part of the
+ java libraries. People have been using a codec in sun.misc.*, but this was never
+ supported and, lo and behold, the API has disappeared in <b>Tiger</b>.
+ 
+ <p>These codecs translate between byte sequences and characters so, in many ways,
+ the natural place for them is in the character encoding system. In a real sense they're
+ just another interpretation of binary data as characters.</p>
+ 
+ <p>By creating an approprate CharsetProvider class which can be referenced from
+ the META-INF/services directory this library enables the codecs to be invoked
+ just by using their names, especially in String.getBytes and the String constructor
+ from bytes.</p>
+ 
+ <p>The most important non-standard behaviour of these codecs is that, in the event
+ that the characters supplied to the Encoder not being valid code they throw a
+ IllegalArgumentException, rather that substitute a "?" byte, a useless behaviour
+ in this context. I'd rather have thrown an appropriate exception from the java.nio.charset
+ set, but unfortunately the conversion methods in String intercept these.</p>
+ 
+ <p>The CharsetProvider treat the encoding "name" passed in a rather special way, gleaning
+ extra information from  it.<p>
+ <dl><dt>base64</dt><dd>Generates standard base64 without whitespace.</dd>
+ <dt>base64:nn</dt><dd>Where nn is a number between 4 and 1024, inserts a line
+ break every nn characters when encoding.</dd>
+ <dt>hex</dt><dd>Generates standard hex using lower case letters a-f.</dd>
+ <dt>HEX</dt><dd>Generates hex using upper case letters for A-F.</dd>
+ <dt>hex:nn</dt><dd>Generates hex with line breaks every nn characters.</dd>
+ </dl>
+<p>When compiling these, remember the services directory must be copied
+to the META-INF in the build/classes or whatever, where it will be
+incorporated in the jar.</p>
+
+<p>Limited <a href="javadoc/index.html">Javadocs</a> are in the archive.</p>
+</body>
+</html>
+
