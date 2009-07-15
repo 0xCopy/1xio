@@ -61,7 +61,6 @@ public class TestNNTP extends TestCase {
                                         ((NntpSession) selectionKey.attachment()).lifecyle.onWrite(selectionKey);
                                         break;
                                     }
-
                                 }
                             }
                         } catch (IOException e) {

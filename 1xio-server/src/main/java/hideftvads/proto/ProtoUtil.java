@@ -20,6 +20,7 @@ public class ProtoUtil {
 
     public static ExecutorService threadPool = Executors.newCachedThreadPool();
     public static final Charset UTF8 = Charset.forName("UTF8");
+    public static final ByteBuffer WS = ByteBuffer.wrap(new byte[]{' '  });
     public static final ByteBuffer EOL = ByteBuffer.wrap(new byte[]{'\r', '\n'});
     //    static final Charset UTF8 = Charset.forName("UTF8");
     static final byte[] FIREFOX_ENDLINE = new byte[]{'\r', '\n',

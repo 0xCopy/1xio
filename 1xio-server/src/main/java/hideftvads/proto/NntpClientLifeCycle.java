@@ -8,6 +8,7 @@ import java.net.*;
 import java.nio.*;
 import java.nio.channels.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * User: jim
@@ -58,6 +59,12 @@ public enum NntpClientLifeCycle {
                                 setLifecycle(selectionKey, desiredOps, desiredState);
 
                             }
+                            if (charBuffer.toString().startsWith("222 ")) {
+                                final int desiredOps = SelectionKey.OP_READ;
+                                NntpClientLifeCycle desiredState = NntpClientLifeCycle.BODY;
+                                setLifecycle(selectionKey, desiredOps, desiredState);
+                            }
+
                             if (charBuffer.toString().startsWith("215 ")) {
                                 final int desiredOps = SelectionKey.OP_READ;
                                 NntpClientLifeCycle desiredState = NntpClientLifeCycle.LIST;
@@ -65,7 +72,7 @@ public enum NntpClientLifeCycle {
                             }
                             if (charBuffer.toString().startsWith("281 ")) {
                                 final int desiredOps = SelectionKey.OP_WRITE;
-                                NntpClientLifeCycle desiredState = NntpClientLifeCycle.LIST;
+                                NntpClientLifeCycle desiredState = NntpClientLifeCycle.BODY;
 
                                 setLifecycle(selectionKey, desiredOps, desiredState);
                             }
@@ -95,19 +102,7 @@ public enum NntpClientLifeCycle {
             }
         }
     }, LIST {
-//        public void onWrite(SelectionKey k) {
-//            final SocketChannel c = (SocketChannel) k.channel();
-//            try {
-//
-//                int i = 0;
-//                i += c.write((ByteBuffer) token.position(0));
-        //                i += c.write((ByteBuffer) ProtoUtil.EOL.position(0));
-        //                System.err.println("sent " + i + " " + header.position(0));
-        //                setLifecycle(k, SelectionKey.OP_READ, LIST);
-        //            } catch (IOException e) {
-        //                e.printStackTrace();  //TODO: Verify for a purpose
-        //            }
-        //        }
+
         public void onRead(SelectionKey k) {
             try {
 
@@ -117,13 +112,13 @@ public enum NntpClientLifeCycle {
 //                int ci;
                 FileChannel channel;
                 RandomAccessFile randomAccessFile;
-                if (x.groups != null) {
-                    buffer = x.groups;
+                if (x.LIST != null) {
+                    buffer = x.LIST;
                     channel = x.gchannel;
                     randomAccessFile = x.gfile;
 
                 } else {
-                    final File tempFile = File.createTempFile("1xio", ".tmp");
+                    final File tempFile = File.createTempFile("1xio", ".groups");
                     tempFile.deleteOnExit();
                     tempFile.delete();
 
@@ -133,9 +128,9 @@ public enum NntpClientLifeCycle {
 
                     channel = randomAccessFile.getChannel();
                     buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, GRPLEN);
-                     x.gfile = randomAccessFile;
+                    x.gfile = randomAccessFile;
                     x.gchannel = channel;
-                    x.groups = buffer;
+                    x.LIST = buffer;
                 }
                 long l = 0;
                 boolean once = false;
@@ -145,29 +140,37 @@ public enum NntpClientLifeCycle {
 
                 if (l > 0) {
                     final int ci = x.gcursor;
-                    System.err.println("read " + l + "@" + ci + ":" + buffer.get((int) (ci - 4))
-                            + ":" + buffer.get((int) (ci - 3))
-                            + ":" + buffer.get((int) (ci - 2))
-                            + ":" + buffer.get((int) (ci - 1))
-                            + ":" + buffer.get((int) (ci))
-                    );
+                    if (ci % 50 == 0)
+                        System.err.println("read " + l + "@" + ci + ":" + buffer.get(ci - 4)
+                                + ":" + buffer.get(ci - 3)
+                                + ":" + buffer.get(ci - 2)
+                                + ":" + buffer.get(ci - 1)
+                                + ":" + buffer.get(ci)
+                        );
 
                 }
                 if (
-                        buffer.get((int) ( x.gcursor  - 4)) == '\n' &&
-                                buffer.get((int) ( x.gcursor -3)) == '.' &&
-                                buffer.get((int) ( x.gcursor -2)) == '\r' &&
-                                buffer.get((int) ( x.gcursor -1)) == '\n'  
-                                                                                                                                        ){
-                    x.gfile .setLength(  x.gcursor );
-                    setLifecycle(k, SelectionKey.OP_READ, exec);
-                    System.err.println("total " +  x.gcursor );
-                    //
-                    final LinkedList<Pair<Integer, LinkedList<Integer>>> list = ProtoUtil.preIndex(buffer);
+                        buffer.get(x.gcursor - 4) == '\n' &&
+                                buffer.get(x.gcursor - 3) == '.' &&
+                                buffer.get(x.gcursor - 2) == '\r' &&
+                                buffer.get(x.gcursor - 1) == '\n'
+                        ) {
+                    try {
+                        buffer = null;
+                        x.gfile.setLength(x.gcursor);
+                        x.LIST = x.gchannel.map(FileChannel.MapMode.READ_ONLY, 0, x.gcursor);
+                        setLifecycle(k, SelectionKey.OP_READ, exec);
+                        System.err.println("total " + x.gcursor);
+                        //
+                        final LinkedList<Pair<Integer, LinkedList<Integer>>> list = ProtoUtil.preIndex(x.LIST);
+                        x.groupList = new CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>>(list.toArray(new Pair[0]));
+                    } catch (IOException e) {
+                        e.printStackTrace();  //TODO: Verify for a purpose
+                    }
 
-                    final Iterator<Pair<Integer, LinkedList<Integer>>> pairIterator = list.descendingIterator();
 
-
+                    System.err.println(Arrays.toString(x.groupList.toArray()));
+                    x.LIST.clear();
                     return;
                 }
 
@@ -211,9 +214,164 @@ public enum NntpClientLifeCycle {
                 e.printStackTrace();  //TODO: Verify for a purpose
             }
 
-        }}, READY, VERSION, CAPABILITIES;
+        }}, READY, VERSION, CAPABILITIES, BODY {
+
+
+        public void onRead(SelectionKey k) {
+            try {
+
+                final NntpSession x = (NntpSession) k.attachment();
+
+                ByteBuffer buffer;
+//                int ci;
+                FileChannel channel;
+                RandomAccessFile randomAccessFile;
+                if (x.LIST != null) {
+                    buffer = x.LIST;
+                    channel = x.bchannel;
+                    randomAccessFile = x.bfile;
+
+                } else {
+                    final File tempFile = File.createTempFile("1xio", ".body");
+                    tempFile.deleteOnExit();
+                    tempFile.delete();
+
+                    final boolean b = tempFile.createNewFile();
+                    randomAccessFile = new RandomAccessFile(tempFile.getAbsoluteFile(), "rw");
+                    randomAccessFile.setLength(BLEN);
+
+                    channel = randomAccessFile.getChannel();
+                    buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, BLEN);
+                    x.bfile = randomAccessFile;
+                    x.bchannel = channel;
+                    x.LIST = buffer;
+                }
+                long l = 0;
+                x.bcursor += l = channel.transferFrom((ReadableByteChannel) k.channel(), x.bcursor, BLEN - x.bcursor);
+
+                if (l > 0) {
+                    final int ci = (int) x.bcursor;
+                    if (ci % 50 == 0)
+                        System.err.println("read " + l + "@" + ci + ":" + buffer.get(ci - 4)
+                                + ":" + buffer.get(ci - 3)
+                                + ":" + buffer.get(ci - 2)
+                                + ":" + buffer.get(ci - 1)
+                                + ":" + buffer.get(ci)
+                        );
+                }
+                if (
+                        buffer.get((int) (x.bcursor - 4)) == '\n' &&
+                                buffer.get((int) (x.bcursor - 3)) == '.' &&
+                                buffer.get((int) (x.bcursor - 2)) == '\r' &&
+                                buffer.get((int) (x.bcursor - 1)) == '\n'
+                        ) {
+                    try {
+                        buffer = null;
+                        x.bfile.setLength(x.bcursor);
+                        x.BODY = x.bchannel.map(FileChannel.MapMode.PRIVATE, 0, x.bcursor);
+                        setLifecycle(k, SelectionKey.OP_READ, exec);
+                        System.err.println("total " + x.bcursor);
+                        //
+                        final LinkedList<Pair<Integer, LinkedList<Integer>>> list = ProtoUtil.preIndex(x.BODY);
+
+                        x.bLines = new CopyOnWriteArrayList<Pair<Integer, LinkedList<Integer>>>(list.toArray(new Pair[0]));
+                    } catch (IOException e) {
+                        e.printStackTrace();  //TODO: Verify for a purpose
+                    }
+
+
+//                System.err.println(Arrays.toString(x.bLines.toArray()));
+                    x.BODY.clear();
+                    boolean trigger = false;
+                    for (Pair<Integer, LinkedList<Integer>> bLine : x.bLines) {
+
+                        if (trigger) {
+                            x.BODY.clear();
+                            x.BODY.position(bLine.$1());
+                            x.BODY.compact();
+                            break;
+
+                        } else {
+                            if (bLine.$2().isEmpty()) {
+                                continue;
+                            }
+                            final Integer integer = bLine.$1();
+                            final Integer integer1 = bLine.$2().getFirst();
+                            if (BEGIN.limit() == integer1 - integer) {
+                                final ByteBuffer buffer1 = (ByteBuffer) x.BODY.limit(integer1).position(integer);
+                                final int test = buffer1.compareTo((ByteBuffer) BEGIN.position(0));
+
+                                if (test == 0) {
+                                    trigger = true;
+                                    try {
+                                        x.BODY.limit(bLine.$2().get(2)-1).position(bLine.$2().get(1));
+
+                                        x.fname = ProtoUtil.UTF8.decode(x.BODY).toString();
+                                        System.err.println("fname " + x.fname);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();  //TODO: Verify for a purpose
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (trigger) {
+
+                        final Integer integer = x.bLines.get(x.bLines.size() - 2).$1();
+                        final CharBuffer charBuffer = ProtoUtil.UTF8.decode(((ByteBuffer) x.BODY.position(integer)));
+                        System.err.println("last  " + integer + "  " + charBuffer);
+                        final byte[] bytes;
+                        try {
+                            x.BODY.rewind();
+                            final boolean b = x.BODY.hasArray();
+                            final byte[] bytes1 = b ? x.BODY.array() : new byte[x.BODY.limit()];
+                            if (!b) x.BODY.get(bytes1);
+                            bytes = Base64.decodeFast(bytes1);
+                        } finally {
+                        }
+                        final int length = bytes.length;
+                        System.err.println("decoded " + length);
+                        if (length > 0) {
+                            final FileOutputStream file = new FileOutputStream(x.fname);
+                            file.write(bytes);
+                            file.close();
+
+                        }
+                    }
+                    return;
+                }
+
+
+            } catch (IOException e) {
+                e.printStackTrace();  //TODO: Verify for a purpose
+            }
+
+
+        }
+        public void onWrite(SelectionKey k) {
+
+            final SocketChannel c = (SocketChannel) k.channel();
+            try {
+
+                int i = 0;
+                i += c.write((ByteBuffer) token.position(0));
+                i += c.write(ProtoUtil.UTF8.encode(" " + ((NntpSession) k.attachment()).ID));
+                i += c.write((ByteBuffer) ProtoUtil.EOL.position(0));
+                System.err.println("sent " + i + " " + header.position(0) + " " + "****");
+                setLifecycle(k, SelectionKey.OP_READ, exec);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        };
+    };
+    private static final ByteBuffer BEGIN = ProtoUtil.UTF8.encode("begin ");
 
     private static final int GRPLEN = 1 << 24L;
+
+    private static final long BLEN = GRPLEN << 2;
+
+
     private static final byte[] WS = new byte[]{' '};
 
     private static void setLifecycle(SelectionKey selectionKey, int desiredOps, NntpClientLifeCycle desiredState) {
