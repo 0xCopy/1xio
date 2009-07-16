@@ -1,7 +1,6 @@
 package hideftvads.proto;
 
 import alg.*;
-import ar.com.ktulu.yenc.*;
 
 import java.io.*;
 import java.lang.ref.*;
@@ -211,7 +210,11 @@ public enum NntpClientLifeCycle {
                 e.printStackTrace();
             }
 
-        }}, READY, VERSION, CAPABILITIES, BODY {
+        }},
+    READY,
+    VERSION,
+    CAPABILITIES,
+    BODY {
 
 
         public void onRead(SelectionKey k) {
@@ -275,7 +278,7 @@ public enum NntpClientLifeCycle {
                         x.bodyLines = ProtoUtil.preIndex(x.BODY);
                         final ListIterator<Pair<Integer, LinkedList<Integer>>> listIterator = x.bodyLines.listIterator();
                         boolean uudecode = false;
-                        boolean ydecode = false;
+                        boolean useYdec = false;
                         while (listIterator.hasNext()) {
                             Pair<Integer, LinkedList<Integer>> line = listIterator.next();
                             listIterator.remove();
@@ -295,7 +298,7 @@ public enum NntpClientLifeCycle {
                                 x.outputName = ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.limit(tokenIndexes.get(2) - 1).position(tokenIndexes.get(1))).toString();
                                 System.err.println("yenc decode ");
 //                                System.err.println("starting from " + left + ": found outputname " + ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.reset()));
-                                ydecode = true;
+                                useYdec = true;
                                 break;
                             }
                         }
@@ -319,27 +322,19 @@ public enum NntpClientLifeCycle {
                                         }
                                     }
                             }
-                        else if (ydecode) {
-                            YEncDecoder d = new YEncDecoder();
+                        else if (useYdec) {
 
-
-                            d.setInputStream(new FileInputStream(x.bodyTmpFile));
-                            final File tempFile = File.createTempFile("1xio", ".yenc");
-
-                            final boolean b = tempFile.createNewFile();
-
-                            System.err.println("ydecoder outfilename " + tempFile.getAbsolutePath());
-                            d.setOutputStream(new FileOutputStream(tempFile.getAbsolutePath()));
-
+//                            try {
                             try {
-                                x.outputName = d.getFileName();
-
-                                d.decode();
-                            } catch (YEncException e) {
-                                e.printStackTrace();  //TODO: Verify for a purpose
+                                x.bodyFile.seek(0);
+                                YDecoder.decode(x.bodyFile, "./");
+                            } catch (Throwable e) {
+                                e.printStackTrace();
                             }
-
-                            System.err.println("ydec wrote " + tempFile.getAbsolutePath() + " b: " + tempFile.length());
+//                            } catch (YEncException e) {
+//                                e.printStackTrace(); 
+//                            }
+//                            System.err.println("ydec wrote " + tempFile.getAbsolutePath() + " b: " + tempFile.length());
 
                         }
 
@@ -363,9 +358,10 @@ public enum NntpClientLifeCycle {
 
                 int i = 0;
                 i += c.write((ByteBuffer) token.position(0));
-                i += c.write(ProtoUtil.UTF8.encode(" " + ((NntpSession) k.attachment()).ID));
+                final String s = ((NntpSession) k.attachment()).FETCH_ID;
+                i += c.write(ProtoUtil.UTF8.encode(" " + s));
                 i += c.write((ByteBuffer) ProtoUtil.EOL.position(0));
-                System.err.println("sent " + i + " " + header.position(0) + " " + "****");
+                System.err.println("sent " + i + " " + header.position(0) + " " + s + '.');
                 setLifecycle(k, SelectionKey.OP_READ, exec);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -469,7 +465,7 @@ public enum NntpClientLifeCycle {
             System.err.println("sent " + i + " " + header.position(0) + " " + "****");
             setLifecycle(k, SelectionKey.OP_READ, exec);
         } catch (IOException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
+            e.printStackTrace();
         }
 
     }
@@ -493,135 +489,161 @@ public enum NntpClientLifeCycle {
     }
 }
 
-//class uudecode {
-//    private byte[] input;
-//    private byte[] output;
-//    private int ooffset;
-//    private int offset;
-//    public String name;
-//
-//    uudecode(byte[] is) throws IOException {
-//
-//        input = is;
-//        output = new byte[is.length];
-//    }
-//
-//    uudecode(  String filename) throws IOException {
-//        FileInputStream fis = new FileInputStream(filename);
-//        int bytesize;
-//        input = new byte[4000000];
-//        bytesize = fis.read(input, 0, 4000000);
-//        output = new byte[bytesize];
-//    }
-//
-//
-//    public void run() throws Throwable {
-//        offset += 10;
-//        get_name();
-//        decode();
-//        return;
-//    }
-//
-//    private int decode() throws Throwable {                            
-//        while (input[offset] != 32) {                        
-//            int encodedoctets;                            
-//            encodedoctets = decode_char(input[offset]);                
-//            for (++offset; encodedoctets > 0; offset += 4, encodedoctets -= 3) { 
-//                int ch;                                
-//                if (encodedoctets >= 3) {                    
-//                    ch = decode_char(input[offset]) << 2 |             
-//                            decode_char(input[offset + 1]) >> 4;            
-//                    output[ooffset++] = (byte) ch;                
-//                    ch = decode_char(input[offset + 1]) << 4 |             
-//                            decode_char(input[offset + 2]) >> 2;            
-//                    output[ooffset++] = (byte) ch;                
-//                    ch = decode_char(input[offset + 2]) << 6 |             
-//                            decode_char(input[offset + 3]);                
-//                    output[ooffset++] = (byte) ch;                
-//                } else {
-//                    if (encodedoctets >= 1) {                    
-//                        ch = decode_char(input[offset]) << 2 |         
-//                                decode_char(input[offset + 1]) >> 4;            
-//                        output[ooffset++] = (byte) ch;                
-//                    }
-//                    if (encodedoctets >= 2) {                    
-//                        ch = decode_char(input[offset + 1]) << 4 |         
-//                                decode_char(input[offset + 2]) >> 2;            
-//                        output[ooffset++] = (byte) ch;                
-//                    }
-//                }
-//            }
-//            skip_to_newline();                            
-//        }
-//        skip_to_newline();                            
-//        if (input[offset] == 'e' && input[offset + 1] == 'n'                
-//                && input[offset + 2] == 'd') {                        
-//            return 0;                                
-//        }
-//        return -1;                                
-//    }
-//
-//    private void skip_to_newline() {                        
-//        while (offset < input.length && input[offset] != 10)                         {
-//            offset++;
-//        }                                
-//        offset++;                                 
-//        return;
-//    }
-//
-//    private int decode_char(int in) {                        
-//        return ((in) - ' ') & 63;                        
-//    }
-//
-//    private void get_name() {                            
-//        int start = offset;                            
-//        while (input[offset] != 32) {                        
-//            offset++;                                
-//        }
-//        name = new String(input, start, offset - start);                
-//        offset += 2;                                
-//        return;
-//    }
-//
-//    /*==========================================================================*/
-//    public void write_file(String filename) throws IOException {
-//        FileOutputStream fos = new FileOutputStream(filename);
-//        fos.write(output, 0, ooffset);
-//        System.err.println(new File(filename).getAbsolutePath());
-//    }
-//
-//    public void reset() {
-//        ooffset = 0;
-//        offset = 0;
-//        return;
-//    }
-//
-//    public static void main(String[] args) {
-//        uudecode bin;
-//        long time;
-//        try {
-//            bin = new uudecode(args[0]);
-//        }
-//        catch (IOException e) {
-//            return;
-//        }
-//        long start = System.currentTimeMillis();
-//        for (int i = 0; i < 100; i += 1) {
-//            bin.reset();
-//            try {
-//                bin.run();
-//            } catch (Throwable throwable) {
-//                throwable.printStackTrace();   
-//            }
-//        }
-//        long end = System.currentTimeMillis();
-//        time = end - start;
-//        System.out.print("" + (float) time / 1000.0);
-//        try {
-//            bin.write_file(bin.name);
-//        }
-//        catch (IOException e) {
-//            return;
-//        }
-//    }
-//}
+/**
+ * Implementation of the <b>decoder</b> for YEncoding project.
+ * <p/>
+ * This class is to be used to decode files encoded with yenc<br>
+ * <FONT Size=+2>See <a href="http://www.yenc.org">www.yenc.org</a> for details.</FONT>
+ * <p/>
+ * To <b>run</b> the project, use:<br>
+ * <code>java org.yenc.YDecoder FileToDecode DestinationFolder</code>
+ * <p/>
+ * Known limitations:
+ * <UL>
+ * * The CRC is not checked.<br>
+ * * I tried using Streams, but those do not support binary very well.<br>
+ * </UL>
+ * <p/>
+ * <p/>
+ * If you have imporovements to this code, please send them to me or to yenc@infostar.de
+ * <p/>
+ *
+ * @author &lt; Alex Rass &gt; sashasemail@yahoo.com
+ * @version 2<br>
+ *          Copywrite by Alex Rass 2002.
+ *          This software is to be distributed in accordance with the GNU piblic license.
+ */
+final class YDecoder {
+    private static final String EMPTY_STRING = "";
+
+    static {
+        System.err.println("Decoder for YEnc.org project.  Version " + getVersionNumber());
+    }
+
+    /**
+     * Making this private, ensures that noone tries to instantiate this class.
+     */
+    private YDecoder() {
+    }
+
+    /**
+     * This method does all of the decoding work.
+     *
+     * @param file   takes a file to read from
+     * @param folder destination folder.
+     *               File will be created based on the name provided by the header.
+     *               <p/>
+     *               if there is an error in the header and the name
+     *               can not be obtained, "unknown" is used.
+     * @throws IOException
+     */
+    public static void decode(RandomAccessFile file, String folder) throws IOException {
+        /* Get initial parameters */
+        String line = file.readLine();
+        L1:
+        while (line != null && !line.startsWith("=ybegin")) {
+            line = file.readLine();
+        }
+        if (line != null) {
+
+            String fileName = parseForName(line, "name");
+            if (fileName == null)
+                fileName = "Unknown.blob";
+            fileName = folder + fileName;
+            RandomAccessFile fileOut = new RandomAccessFile(fileName, "rw");
+
+            String partNo = parseForName(line, "part");
+
+            /* Handle Multi-part */
+            if (partNo == null) {
+                try {
+                    fileOut.setLength(0); // reset file
+    
+                    /* Decode the file */
+                    int character;
+                    boolean special = false;
+    
+                    line = file.readLine();
+                    while (line != null && !line.startsWith("=yend")) {
+                        for (int lcv = 0; lcv < line.length(); lcv++) {
+                            character = (int) line.charAt(lcv);
+                            if (character != 61) {
+                                character = decodeChar(character, special);
+                                fileOut.write(character);
+                                //System.out.print((char) character);
+                                special = false;
+                            } else
+                                special = true;
+                        }
+                        line = file.readLine();
+                    }
+                    fileOut.close();
+                } catch (IOException e) {
+                    e.printStackTrace();  //TODO: Verify for a purpose
+                }
+            } else {
+                while (line != null && !line.startsWith("=ypart")) {
+                    line = file.readLine();
+                }
+                if (line != null) {
+                    long begin = Long.parseLong(parseForName(line, "begin")) - 1;
+                    if (fileOut.length() < begin)
+                        fileOut.setLength(begin - 1); // reset file
+                    fileOut.seek(begin);
+                }
+//            break;
+            }
+        }
+    }
+
+    private static int decodeChar(int character, boolean special) throws IOException {
+        int result;
+        if (special)
+            character = character - 64;
+
+        result = character - 42;
+
+        if (result < 0)
+            result += 256;
+
+        return result;
+    }
+
+    private static String parseForName(String line, String param) {
+        int indexStart = line.indexOf(param + "=");
+        int indexEnd = line.indexOf(" ", indexStart);
+        if (indexEnd == -1)
+            indexEnd = line.length();
+        if (indexStart > -1)
+            return line.substring(indexStart + param.length() + 1, indexEnd);
+        else
+            return null;
+    }
+
+    /**
+     * Provides a way to find out which version this decoding engine is up to.
+     *
+     * @return Version number
+     */
+    public static int getVersionNumber() {
+        return 2;
+    }
+
+    /**
+     * To Run:
+     * java org.yenc.YDecImpl FileToDecode DestinationFolder
+     *
+     * @param args Command line argument(s)
+     * @throws IOException
+     */
+    public static void main(String... args) throws IOException {
+        if (args.length < 1) {
+            // print usage and exit
+            System.err.println("Usage arguments: fileIn folderOut");
+        } else {
+            RandomAccessFile file = new RandomAccessFile(args[0], "r");
+            String folder = args.length > 1 ? args[1] + File.separator : "";
+            decode(file, folder);
+        }
+    }
+}

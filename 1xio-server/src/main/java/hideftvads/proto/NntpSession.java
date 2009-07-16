@@ -22,9 +22,10 @@ public class NntpSession {
     }*/
     public String AUTHINFO$20USER = System.getenv("NNTP_USER");
     public String AUTHINFO$20PASS = System.getenv("NNTP_PASS");   
-//  uuencoded  public String ID = "<letp55tti95uavt6nekt606mgv8ikbfusb@4ax.com>";
+//  uuencoded  public String FETCH_ID = "<letp55tti95uavt6nekt606mgv8ikbfusb@4ax.com>";
 
-    public String ID = "<fuGdnebDw_jkdQXUnZ2dnUVZ_jYAAAAA@giganews.com>";
+    public String FETCH_ID =System.getenv("NNTP_FETCH");
+//  fail yenc  public String FETCH_ID = "<fuGdnebDw_jkdQXUnZ2dnUVZ_jYAAAAA@giganews.com>";
     public ByteBuffer LIST;
     public int gcursor;
     public FileChannel gchannel;
