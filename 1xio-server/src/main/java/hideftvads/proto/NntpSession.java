@@ -21,8 +21,10 @@ public class NntpSession {
         System.err.println(""+String.valueOf( map) );
     }*/
     public String AUTHINFO$20USER = System.getenv("NNTP_USER");
-    public String AUTHINFO$20PASS = System.getenv("NNTP_PASS");
-    public String ID = "<letp55tti95uavt6nekt606mgv8ikbfusb@4ax.com>";
+    public String AUTHINFO$20PASS = System.getenv("NNTP_PASS");   
+//  uuencoded  public String ID = "<letp55tti95uavt6nekt606mgv8ikbfusb@4ax.com>";
+
+    public String ID = "<fuGdnebDw_jkdQXUnZ2dnUVZ_jYAAAAA@giganews.com>";
     public ByteBuffer LIST;
     public int gcursor;
     public FileChannel gchannel;

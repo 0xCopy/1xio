@@ -1,6 +1,7 @@
 package hideftvads.proto;
 
 import alg.*;
+import ar.com.ktulu.yenc.*;
 
 import java.io.*;
 import java.lang.ref.*;
@@ -109,7 +110,6 @@ public enum NntpClientLifeCycle {
                 final NntpSession x = (NntpSession) k.attachment();
 
                 ByteBuffer buffer;
-//                int ci;
                 FileChannel channel;
                 RandomAccessFile randomAccessFile;
                 if (x.LIST != null) {
@@ -133,10 +133,7 @@ public enum NntpClientLifeCycle {
                     x.LIST = buffer;
                 }
                 long l = 0;
-                boolean once = false;
-//                do {
                 x.gcursor += l = channel.transferFrom((ReadableByteChannel) k.channel(), x.gcursor, GRPLEN - x.gcursor);
-//                x.gcursor = (int) ci;
 
                 if (l > 0) {
                     final int ci = x.gcursor;
@@ -277,81 +274,73 @@ public enum NntpClientLifeCycle {
 
                         x.bodyLines = ProtoUtil.preIndex(x.BODY);
                         final ListIterator<Pair<Integer, LinkedList<Integer>>> listIterator = x.bodyLines.listIterator();
+                        boolean uudecode = false;
+                        boolean ydecode = false;
                         while (listIterator.hasNext()) {
                             Pair<Integer, LinkedList<Integer>> line = listIterator.next();
                             listIterator.remove();
                             final LinkedList<Integer> tokenIndexes = line.$2();
-                            if (tokenIndexes.size() != 3) continue;
+
                             final Integer left = line.$1();
                             final int len = tokenIndexes.getFirst() - left;
-                            if (len == BEGIN.limit() && 0 == ((ByteBuffer) BEGIN.reset()).compareTo((ByteBuffer) x.BODY.limit(left + BEGIN.limit()).position(left).mark())) {
+                            if (len == BEGIN.limit()
+                                    && 0 == ((ByteBuffer) BEGIN.reset()).compareTo((ByteBuffer) x.BODY.limit(left + BEGIN.limit()).position(left).mark())) {
                                 x.outputName = ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.limit(tokenIndexes.get(2) - 1).position(tokenIndexes.get(1))).toString();
                                 System.err.println("outputName " + x.outputName);
                                 System.err.println("starting from " + left + ": found outputname " + ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.reset()));
+                                uudecode = true;
+                                break;
+                            } else if (len == YBEGIN.limit()
+                                    && 0 == ((ByteBuffer) YBEGIN.reset()).compareTo((ByteBuffer) x.BODY.limit(left + YBEGIN.limit()).position(left).mark())) {
+                                x.outputName = ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.limit(tokenIndexes.get(2) - 1).position(tokenIndexes.get(1))).toString();
+                                System.err.println("yenc decode ");
+//                                System.err.println("starting from " + left + ": found outputname " + ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.reset()));
+                                ydecode = true;
                                 break;
                             }
                         }
                         final Iterator<Pair<Integer, LinkedList<Integer>>> pairIterator = x.bodyLines.descendingIterator();
-                        while (pairIterator.hasNext()) {
-                            Pair<Integer, LinkedList<Integer>> line = pairIterator.next();
-                            pairIterator.remove();
-                            Integer left = null;
-                            left = line.$1();
-                            //                            if (!line.$2().isEmpty())
-                            if (line.$2().size() == 1)
-                                if (2 == line.$2().getLast() - left) {
-                                    System.err.println(line.toString()
-                                            + ' '
-                                            + ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.limit(line.$2().getLast()).position(left)));
+                        if (uudecode)
+                            while (pairIterator.hasNext()) {
+                                Pair<Integer, LinkedList<Integer>> line = pairIterator.next();
+                                pairIterator.remove();
+                                Integer left = null;
+                                left = line.$1();
+                                //                            if (!line.$2().isEmpty())
+                                if (line.$2().size() == 1)
+                                    if (2 == line.$2().getLast() - left) {
+                                        System.err.println(line.toString()
+                                                + ' '
+                                                + ProtoUtil.UTF8.decode((ByteBuffer) x.BODY.limit(line.$2().getLast()).position(left)));
 
-                                    if ('`' == ((ByteBuffer) x.BODY.limit(line.$2().getLast())).get(left)) {
-                                        x.BODY.position(x.bodyLines.getFirst().$1()).mark();
-
-
-  
-
-                                        ByteBuffer input=x.BODY.duplicate();
-                                        int ooffset = 0;
-                                        final RandomAccessFile of = new RandomAccessFile(x.outputName, "rw");
-                                        of .setLength(input.remaining());
-                                        ByteBuffer os= (((RandomAccessFile) of)).getChannel(). map(FileChannel.MapMode.READ_WRITE, 0,of.length());
-                                        for (Pair<Integer, LinkedList<Integer>> pair : x.bodyLines) {
-                                            Integer offset = pair.$1();
-                                            int encodedoctets =  decode_char(input.get(offset))   ;
-                                            for (++offset; encodedoctets > 0; offset += 4, encodedoctets -= 3) { 
-                                                int ch;
-                                                if (encodedoctets >= 3) {                    
-                                                    ch = decode_char(input.get(offset)) << 2 |             
-                                                            decode_char(input.get(offset + 1)) >> 4;            
-                                                    os.put(ooffset++, (byte) ch);                
-                                                    ch = decode_char(input.get(offset + 1)) << 4 |             
-                                                            decode_char(input.get(offset + 2)) >> 2;            
-                                                    os.put(ooffset++, (byte) ch);                
-                                                    ch = decode_char(input.get(offset + 2)) << 6 |             
-                                                            decode_char(input.get(offset + 3));                
-                                                    os.put(ooffset++, (byte) ch);                
-                                                } else {
-                                                    if (encodedoctets >= 1) {                    
-                                                        ch = decode_char(input.get(offset)) << 2 |         
-                                                                decode_char(input.get(offset + 1)) >> 4;            
-                                                        os.put(ooffset++, (byte) ch);                
-                                                    }
-                                                    if (encodedoctets >= 2) {                    
-                                                        ch = decode_char(input.get(offset + 1)) << 4 |         
-                                                                decode_char(input.get(offset + 2)) >> 2;            
-                                                        os.put(ooffset++, (byte) ch);                
-                                                    }
-                                                }
-                                            }
-                                            
+                                        if ('`' == ((ByteBuffer) x.BODY.limit(line.$2().getLast())).get(left)) {
+                                            uud(x);
+                                            break;
                                         }
-                                        of.setLength(ooffset-1);
-                                        
-                                        System.err.println("output wrote "+new File(x.outputName).getAbsolutePath()+ " "+of.length()+" bytes");
-                                        of.close();
-                                        break;
                                     }
-                                }
+                            }
+                        else if (ydecode) {
+                            YEncDecoder d = new YEncDecoder();
+
+
+                            d.setInputStream(new FileInputStream(x.bodyTmpFile));
+                            final File tempFile = File.createTempFile("1xio", ".yenc");
+
+                            final boolean b = tempFile.createNewFile();
+
+                            System.err.println("ydecoder outfilename " + tempFile.getAbsolutePath());
+                            d.setOutputStream(new FileOutputStream(tempFile.getAbsolutePath()));
+
+                            try {
+                                x.outputName = d.getFileName();
+
+                                d.decode();
+                            } catch (YEncException e) {
+                                e.printStackTrace();  //TODO: Verify for a purpose
+                            }
+
+                            System.err.println("ydec wrote " + tempFile.getAbsolutePath() + " b: " + tempFile.length());
+
                         }
 
                     } catch (IOException e) {
@@ -360,14 +349,12 @@ public enum NntpClientLifeCycle {
                 }
 
             } catch (FileNotFoundException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
+                e.printStackTrace();
             } catch (IOException e) {
-                e.printStackTrace();  //TODO: Verify for a purpose
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();  //TODO: Verify for a purpose
-            }
-        }private int decode_char(byte b) {
-            return b - ' ' & 63;  //To change body of created methods use File | Settings | File Templates.
+                e.printStackTrace();
+            } /*catch (Throwable throwable) {
+                throwable.printStackTrace();
+            }*/
         }
         public void onWrite(SelectionKey k) {
 
@@ -386,6 +373,55 @@ public enum NntpClientLifeCycle {
 
         };
     };
+
+    private static void uud(NntpSession x) throws IOException {
+        x.BODY.position(x.bodyLines.getFirst().$1()).mark();
+
+        ByteBuffer input = x.BODY.duplicate();
+        int ooffset = 0;
+        final RandomAccessFile of = new RandomAccessFile(x.outputName, "rw");
+        of.setLength(input.remaining());
+        ByteBuffer os = (((RandomAccessFile) of)).getChannel().map(FileChannel.MapMode.READ_WRITE, 0, of.length());
+        for (final Pair<Integer, LinkedList<Integer>> pair : x.bodyLines) {
+            Integer offset = pair.$1();
+            int encodedoctets = decode_char(input.get(offset));
+            for (++offset; encodedoctets > 0; offset += 4, encodedoctets -= 3) {
+                int ch;
+                if (encodedoctets >= 3) {
+                    ch = decode_char(input.get(offset)) << 2 |
+                            decode_char(input.get(offset + 1)) >> 4;
+                    os.put(ooffset++, (byte) ch);
+                    ch = decode_char(input.get(offset + 1)) << 4 |
+                            decode_char(input.get(offset + 2)) >> 2;
+                    os.put(ooffset++, (byte) ch);
+                    ch = decode_char(input.get(offset + 2)) << 6 |
+                            decode_char(input.get(offset + 3));
+                    os.put(ooffset++, (byte) ch);
+                } else {
+                    if (encodedoctets >= 1) {
+                        ch = decode_char(input.get(offset)) << 2 |
+                                decode_char(input.get(offset + 1)) >> 4;
+                        os.put(ooffset++, (byte) ch);
+                    }
+                    if (encodedoctets >= 2) {
+                        ch = decode_char(input.get(offset + 1)) << 4 |
+                                decode_char(input.get(offset + 2)) >> 2;
+                        os.put(ooffset++, (byte) ch);
+                    }
+                }
+            }
+        }
+        of.setLength(ooffset - 1);
+
+        System.err.println("output wrote " + new File(x.outputName).getAbsolutePath() + " " + of.length() + " bytes");
+        of.close();
+    }
+
+    private static int decode_char(byte b) {
+        return b - ' ' & 63;
+    }
+
+    private static final ByteBuffer YBEGIN = (ByteBuffer) ProtoUtil.UTF8.encode("=ybegin ").mark();
     private static final ByteBuffer BEGIN = (ByteBuffer) ProtoUtil.UTF8.encode("begin ").mark();
 
     private static final int GRPLEN = 1 << 24L;
@@ -410,7 +446,7 @@ public enum NntpClientLifeCycle {
                     channel())
                     .finishConnect();
         } catch (IOException e) {
-            e.printStackTrace();  //TODO: Verify for a purpose
+            e.printStackTrace();
         }
         if (ready) {
             selectionKey.interestOps(SelectionKey.OP_READ);
@@ -457,137 +493,135 @@ public enum NntpClientLifeCycle {
     }
 }
 
-class uudecode {
-    /*==========================================================================*/
-
-    private byte[] input;
-    private byte[] output;
-    private int ooffset;
-    private int offset;
-    public String name;
-
-    uudecode(byte[] is) throws IOException {
-
-        input = is;
-        output = new byte[is.length];
-    }
-
-    uudecode(String filename) throws IOException {
-        FileInputStream fis = new FileInputStream(filename);
-        int bytesize;
-        input = new byte[4000000];
-        bytesize = fis.read(input, 0, 4000000);
-        output = new byte[bytesize];
-    }
-
-
-    public void run() throws Throwable {
-        offset += 10;
-        get_name();
-        decode();
-        return;
-    }
-
-    private int decode() throws Throwable {                            
-        while (input[offset] != 32) {                        
-            int encodedoctets;                            
-            encodedoctets = decode_char(input[offset]);                
-            for (++offset; encodedoctets > 0; offset += 4, encodedoctets -= 3) { 
-                int ch;                                
-                if (encodedoctets >= 3) {                    
-                    ch = decode_char(input[offset]) << 2 |             
-                            decode_char(input[offset + 1]) >> 4;            
-                    output[ooffset++] = (byte) ch;                
-                    ch = decode_char(input[offset + 1]) << 4 |             
-                            decode_char(input[offset + 2]) >> 2;            
-                    output[ooffset++] = (byte) ch;                
-                    ch = decode_char(input[offset + 2]) << 6 |             
-                            decode_char(input[offset + 3]);                
-                    output[ooffset++] = (byte) ch;                
-                } else {
-                    if (encodedoctets >= 1) {                    
-                        ch = decode_char(input[offset]) << 2 |         
-                                decode_char(input[offset + 1]) >> 4;            
-                        output[ooffset++] = (byte) ch;                
-                    }
-                    if (encodedoctets >= 2) {                    
-                        ch = decode_char(input[offset + 1]) << 4 |         
-                                decode_char(input[offset + 2]) >> 2;            
-                        output[ooffset++] = (byte) ch;                
-                    }
-                }
-            }
-            skip_to_newline();                            
-        }
-        skip_to_newline();                            
-        if (input[offset] == 'e' && input[offset + 1] == 'n'                
-                && input[offset + 2] == 'd') {                        
-            return 0;                                
-        }
-        return -1;                                
-    }
-
-    private void skip_to_newline() {                        
-        while (offset < input.length && input[offset] != 10)                         {
-            offset++;
-        }                                
-        offset++;                                 
-        return;
-    }
-
-    private int decode_char(int in) {                        
-        return ((in) - ' ') & 63;                        
-    }
-
-    private void get_name() {                            
-        int start = offset;                            
-        while (input[offset] != 32) {                        
-            offset++;                                
-        }
-        name = new String(input, start, offset - start);                
-        offset += 2;                                
-        return;
-    }
-
-    /*==========================================================================*/
-    public void write_file(String filename) throws IOException {
-        FileOutputStream fos = new FileOutputStream(filename);
-        fos.write(output, 0, ooffset);
-        System.err.println(new File(filename).getAbsolutePath());
-    }
-
-    public void reset() {
-        ooffset = 0;
-        offset = 0;
-        return;
-    }
-
-    public static void main(String[] args) {
-        uudecode bin;
-        long time;
-        try {
-            bin = new uudecode(args[0]);
-        }
-        catch (IOException e) {
-            return;
-        }
-        long start = System.currentTimeMillis();
-        for (int i = 0; i < 100; i += 1) {
-            bin.reset();
-            try {
-                bin.run();
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();  //TODO: Verify for a purpose
-            }
-        }
-        long end = System.currentTimeMillis();
-        time = end - start;
-        System.out.print("" + (float) time / 1000.0);
-        try {
-            bin.write_file(bin.name);
-        }
-        catch (IOException e) {
-            return;
-        }
-    }
-}
+//class uudecode {
+//    private byte[] input;
+//    private byte[] output;
+//    private int ooffset;
+//    private int offset;
+//    public String name;
+//
+//    uudecode(byte[] is) throws IOException {
+//
+//        input = is;
+//        output = new byte[is.length];
+//    }
+//
+//    uudecode(  String filename) throws IOException {
+//        FileInputStream fis = new FileInputStream(filename);
+//        int bytesize;
+//        input = new byte[4000000];
+//        bytesize = fis.read(input, 0, 4000000);
+//        output = new byte[bytesize];
+//    }
+//
+//
+//    public void run() throws Throwable {
+//        offset += 10;
+//        get_name();
+//        decode();
+//        return;
+//    }
+//
+//    private int decode() throws Throwable {                            
+//        while (input[offset] != 32) {                        
+//            int encodedoctets;                            
+//            encodedoctets = decode_char(input[offset]);                
+//            for (++offset; encodedoctets > 0; offset += 4, encodedoctets -= 3) { 
+//                int ch;                                
+//                if (encodedoctets >= 3) {                    
+//                    ch = decode_char(input[offset]) << 2 |             
+//                            decode_char(input[offset + 1]) >> 4;            
+//                    output[ooffset++] = (byte) ch;                
+//                    ch = decode_char(input[offset + 1]) << 4 |             
+//                            decode_char(input[offset + 2]) >> 2;            
+//                    output[ooffset++] = (byte) ch;                
+//                    ch = decode_char(input[offset + 2]) << 6 |             
+//                            decode_char(input[offset + 3]);                
+//                    output[ooffset++] = (byte) ch;                
+//                } else {
+//                    if (encodedoctets >= 1) {                    
+//                        ch = decode_char(input[offset]) << 2 |         
+//                                decode_char(input[offset + 1]) >> 4;            
+//                        output[ooffset++] = (byte) ch;                
+//                    }
+//                    if (encodedoctets >= 2) {                    
+//                        ch = decode_char(input[offset + 1]) << 4 |         
+//                                decode_char(input[offset + 2]) >> 2;            
+//                        output[ooffset++] = (byte) ch;                
+//                    }
+//                }
+//            }
+//            skip_to_newline();                            
+//        }
+//        skip_to_newline();                            
+//        if (input[offset] == 'e' && input[offset + 1] == 'n'                
+//                && input[offset + 2] == 'd') {                        
+//            return 0;                                
+//        }
+//        return -1;                                
+//    }
+//
+//    private void skip_to_newline() {                        
+//        while (offset < input.length && input[offset] != 10)                         {
+//            offset++;
+//        }                                
+//        offset++;                                 
+//        return;
+//    }
+//
+//    private int decode_char(int in) {                        
+//        return ((in) - ' ') & 63;                        
+//    }
+//
+//    private void get_name() {                            
+//        int start = offset;                            
+//        while (input[offset] != 32) {                        
+//            offset++;                                
+//        }
+//        name = new String(input, start, offset - start);                
+//        offset += 2;                                
+//        return;
+//    }
+//
+//    /*==========================================================================*/
+//    public void write_file(String filename) throws IOException {
+//        FileOutputStream fos = new FileOutputStream(filename);
+//        fos.write(output, 0, ooffset);
+//        System.err.println(new File(filename).getAbsolutePath());
+//    }
+//
+//    public void reset() {
+//        ooffset = 0;
+//        offset = 0;
+//        return;
+//    }
+//
+//    public static void main(String[] args) {
+//        uudecode bin;
+//        long time;
+//        try {
+//            bin = new uudecode(args[0]);
+//        }
+//        catch (IOException e) {
+//            return;
+//        }
+//        long start = System.currentTimeMillis();
+//        for (int i = 0; i < 100; i += 1) {
+//            bin.reset();
+//            try {
+//                bin.run();
+//            } catch (Throwable throwable) {
+//                throwable.printStackTrace();   
+//            }
+//        }
+//        long end = System.currentTimeMillis();
+//        time = end - start;
+//        System.out.print("" + (float) time / 1000.0);
+//        try {
+//            bin.write_file(bin.name);
+//        }
+//        catch (IOException e) {
+//            return;
+//        }
+//    }
+//}
