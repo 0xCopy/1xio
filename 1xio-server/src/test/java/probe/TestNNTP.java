@@ -27,7 +27,7 @@ public class TestNNTP extends TestCase {
     }
 
 
-    public void testProbe() {
+    public void NotestProbe() {
         try {
             final SocketChannel c = SelectorProvider.provider().openSocketChannel();
 
