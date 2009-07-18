@@ -115,7 +115,8 @@
         </dependency>
         <dependency>
             <groupId>hideftvads</groupId>
-            <artifactId>1xio-yence</artifactId>
+            <artifactId>1xio-dnsjava
+	    </artifactId>
             <version>${parent.version}</version>
         </dependency>
 
