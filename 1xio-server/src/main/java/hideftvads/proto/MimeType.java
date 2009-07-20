@@ -274,7 +274,7 @@ public enum MimeType {
     ott ("application/vnd.oasis.opendocument.text-template"),
     oza ("application/x-oz-application"),
     p7r ("application/x-pkcs7-certreqresp"),
-    pac ("application/x-ns-proxy-autoconfig"),
+    pac ("application/x-ns-srv-autoconfig"),
     pas ("text/x-pascal"),
     patch ("text/x-diff"),
     pat ("image/x-coreldrawpattern"),

@@ -16,16 +16,17 @@ public class ProtoUtil {
     public static final int CHUNK_NUM = 128;
     public static final int KBYTE = 1024;
     static final int MAX_EXP = 16;
-    public static final int DEFAULT_EXP = 0;
+    public static final int DEFAULT_EXP = 4;
 
     public static ExecutorService threadPool = Executors.newCachedThreadPool();
     public static final Charset UTF8 = Charset.forName("UTF8");
-    public static final ByteBuffer WS = ByteBuffer.wrap(new byte[]{' '  });
+    public static final ByteBuffer WS = ByteBuffer.wrap(new byte[]{' '});
     public static final ByteBuffer EOL = ByteBuffer.wrap(new byte[]{'\r', '\n'});
     //    static final Charset UTF8 = Charset.forName("UTF8");
     static final byte[] FIREFOX_ENDLINE = new byte[]{'\r', '\n',
             0};
-    public static boolean killswitch=false;
+    public static boolean killswitch = false;
+    public static Timer timer=new Timer("1xio timer",true);
 
     public
     static Reference<ByteBuffer> borrowBuffer(int... exp) {
@@ -152,5 +153,9 @@ public class ProtoUtil {
             prev = b;
         }
         return lines;
+    }
+                        static 
+    public void recycle(Reference<ByteBuffer> br) {
+        ProtoUtil.recycle(br, DEFAULT_EXP);
     }
 }
