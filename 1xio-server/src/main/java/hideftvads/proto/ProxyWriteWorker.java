@@ -31,7 +31,7 @@ class ProxyWriteWorker implements Runnable {
                 ByteBuffer b = br.get();             
                 while (b.hasRemaining()) {
                     final int i = ((SocketChannel) proxyConnectWorker.client.channel()).write(b);
-                    System.err.println("wrote " + i);
+//                    System.err.println("wrote " + i);
                 }
             } catch ( Exception e) {
                 proxyConnectWorker.client.cancel();
@@ -40,9 +40,9 @@ class ProxyWriteWorker implements Runnable {
                     proxyConnectWorker.client.channel().close();
                     proxyConnectWorker.srv.channel().close();
                 } catch (IOException e1) {
-                    e1.printStackTrace();  //TODO: Verify for a purpose
+//                    e1.printStackTrace();  //TODO: Verify for a purpose
                 }
-                e.printStackTrace();  //TODO: Verify for a purpose
+//                e.printStackTrace();  //TODO: Verify for a purpose
             } finally {
                 ProtoUtil.recycle(br);
             }

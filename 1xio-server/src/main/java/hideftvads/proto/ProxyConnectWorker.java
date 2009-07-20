@@ -24,13 +24,13 @@ class ProxyConnectWorker implements Callable {
     public final SelectionKey srv;
     public final SelectionKey client;
     public final static String[] stifle = new String[]{
-            "Accept-Encoding",
-            "Accept-Charset",
+//            "Accept-Encoding",
+//            "Accept-Charset",
             "Keep-Alive",
             "Connection",
             "Proxy-Connection",
-            "Range", 
-            "If-Modified-Since" , 
+            "Range",
+            "If-Modified-Since",
             "Cache-Control"
     };
 
@@ -80,26 +80,36 @@ class ProxyConnectWorker implements Callable {
 
 
                 for (Pair<Integer, LinkedList<Integer>> line : lines) {
-                    if (line.$2().isEmpty()) break; 
+                    if (line.$2().isEmpty()) break;
                     src.limit(line.$2().getFirst() - 2).position(line.$1());
                     final String s1 = ProtoUtil.UTF8.decode(src).toString();
                     final int i = Arrays.binarySearch(stifle, s1);
                     if (i >= 0) continue;
-                    b.put((ByteBuffer) src.limit(line.$2().getLast()+1).position(line.$1()));
+                    final Integer newLimit = line.$2().getLast();
+
+                    try {
+                        final Buffer buffer = src.limit(newLimit + 1);
+                        final ByteBuffer byteBuffer = (ByteBuffer) buffer.position(line.$1());
+                        b.put(byteBuffer);
+                    } catch (Throwable e) {
+                        b.put((ByteBuffer) src.clear().position(line.$1()));
+                    }
+
                 }
                 b.put((byte) '\r');
                 b.put((byte) '\n');
             }
 
 
-            int ci = b.flip().limit() - 1;
-            System.err.println("to send: " + hideftvads.proto.ProtoUtil.UTF8.decode((ByteBuffer) b.rewind()));
-            System.err.println("to send: " + ci + ":" + b.get(ci - 4)
-                    + ":" + b.get(ci - 3)
-                    + ":" + b.get(ci - 2)
-                    + ":" + b.get(ci - 1)
-                    + ":" + b.get(ci)
-            );
+            /*
+                        System.err.println("to send: " + hideftvads.proto.ProtoUtil.UTF8.decode((ByteBuffer) b.rewind()));
+                        System.err.println("to send: " + ci + ":" + b.get(ci - 4)
+                                + ":" + b.get(ci - 3)
+                                + ":" + b.get(ci - 2)
+                                + ":" + b.get(ci - 1)
+                                + ":" + b.get(ci)
+                        );
+            */
 
             b.rewind();
             while (b.hasRemaining()) {
@@ -115,7 +125,7 @@ class ProxyConnectWorker implements Callable {
         } catch (Throwable e) {
             e.printStackTrace();
         } finally {
-
+                 ProtoUtil.recycle(byteBufferReference);
         }
         return null;
     }

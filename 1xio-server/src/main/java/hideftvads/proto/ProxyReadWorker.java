@@ -32,7 +32,7 @@ class ProxyReadWorker implements Runnable {
                 int i = 0;
                 try {
                     i = is.read(b);
-                    System.err.println("read " + i);
+//                    System.err.println("read " + i);
                     if (-1 == i) {
                         q.add(null);
                     } else
@@ -45,10 +45,13 @@ class ProxyReadWorker implements Runnable {
                     e.printStackTrace();  //TODO: Verify for a purpose
                 }
             } else {
-                proxyConnectWorker.srv.interestOps(0);
+                System.err.println("squelching"); 
+                                proxyConnectWorker.srv.interestOps(0);
+                
                 ProtoUtil.timer.schedule(new TimerTask() {
                     @Override
                     public void run() {
+                        System.err.println("unsquelching"); 
                         proxyConnectWorker.srv.interestOps(java.nio.channels.SelectionKey.OP_READ);
                     }
                 }, 250);
