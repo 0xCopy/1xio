@@ -14,7 +14,9 @@ public enum HttpHeaders {
     Content$2dEncoding,
     Host,
     Accept,
-    User$2dAgent,Cookie,
+    User$2dAgent,
+    Cookie,
+    
     ;
 
     final CharBuffer header = CharBuffer.wrap(URLDecoder.decode(name().replace('$', '%')));

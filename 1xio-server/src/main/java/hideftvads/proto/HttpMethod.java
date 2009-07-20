@@ -13,7 +13,6 @@ import java.net.*;
 import java.nio.*;
 import java.nio.channels.*;
 import static java.nio.channels.SelectionKey.*;
-import java.nio.charset.*;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -486,10 +485,7 @@ public enum HttpMethod {
         throw new UnsupportedOperationException();
     }
 
-    final static Charset charset = UTF8;
-    final static CharsetEncoder charsetEncoder = charset.newEncoder();
-    final static CharsetDecoder decoder = charset.newDecoder();
-
+  
 
     public void onAccept(SelectionKey key) {
         throw new UnsupportedOperationException();

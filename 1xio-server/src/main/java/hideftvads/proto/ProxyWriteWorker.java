@@ -27,7 +27,8 @@ class ProxyWriteWorker implements Runnable {
             Reference<ByteBuffer> br = null;
             try {
                 br = q.take();
-                ByteBuffer b = br.get();
+                if(br==null)  throw new  Exception();
+                ByteBuffer b = br.get();             
                 while (b.hasRemaining()) {
                     final int i = ((SocketChannel) proxyConnectWorker.client.channel()).write(b);
                     System.err.println("wrote " + i);
