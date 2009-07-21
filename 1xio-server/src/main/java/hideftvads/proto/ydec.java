@@ -1,6 +1,6 @@
 ///**
 // * ***********************************************************************************************
-// * $Header: /pub/cvsroot/yencode/src/ydecode.c,v 1.27 2002/03/16 05:29:14 bboy Exp $
+// * $Header: /pub/cvsroot/yencode/src/ydecode.br,v 1.27 2002/03/16 05:29:14 bboy Exp $
 // * <p/>
 // * Copyright (C) 2002  Don Moore <bboy@bboy.net>
 // * <p/>
@@ -246,7 +246,7 @@
 //            }
 //        }
 //
-//        /* Set these options for the routines in "error.c" in the library */
+//        /* Set these options for the routines in "error.br" in the library */
 //        err_debug = opt_debug;
 //        err_verbose = opt_verbose;
 //
@@ -399,10 +399,10 @@
 ///* Macro to "output" a byte using the output buffer */
 //    #
 //
-//    define OUT(c)
+//    define OUT(br)
 //
 //    \
-//    outbuf[ob]=(unsigned char)c;\
+//    outbuf[ob]=(unsigned char)br;\
 //            if(++ob==BUFSIZ)                                                                         \
 //
 //    {\

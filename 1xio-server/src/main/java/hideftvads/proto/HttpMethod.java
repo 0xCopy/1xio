@@ -8,7 +8,6 @@ import javolution.util.*;
 
 import java.io.*;
 import static java.lang.Character.*;
-import java.lang.ref.*;
 import java.net.*;
 import java.nio.*;
 import java.nio.channels.*;
@@ -56,6 +55,8 @@ public enum HttpMethod {
                     final InetSocketAddress remote = new InetSocketAddress(uri.getHost(), port);
                     final SocketChannel sc = SocketChannel.open();
                     sc.configureBlocking(false);
+                    sc.socket().setSoTimeout(30000);
+                    sc.socket().setPerformancePreferences(0,1, 2);
                     sc.socket().setTcpNoDelay(true);
                     sc.connect(remote);
 
@@ -78,16 +79,15 @@ public enum HttpMethod {
                             final SocketChannel channel = (SocketChannel) key.channel();
                             final fileXfer xfer = new fileXfer(fc, path);
                             response(key, $200);
-                            final Reference<ByteBuffer> byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
+                            final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1500));
                             try {
-                                final ByteBuffer buffer1 = byteBufferReference.get();
                                 MimeType mimeType = null;
                                 try {
                                     mimeType = MimeType.valueOf(path.subtext(path.lastIndexOf(".") + 1).toString());
                                 } catch (Exception ignored) {
                                 }
                                 String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
-                                final CharBuffer c = (CharBuffer) buffer1.asCharBuffer().append("Connection: close\n").append(mimeHeader).append("Content-Length: ").append(String.valueOf(fc.size())).append("\n\n").flip();
+                                final CharBuffer c = (CharBuffer) byteBufferReference.asCharBuffer().append("Connection: close\n").append(mimeHeader).append("Content-Length: ").append(String.valueOf(fc.size())).append("\n\n").flip();
                                 channel.write(UTF8.encode(c));
 
 
@@ -277,7 +277,7 @@ public enum HttpMethod {
         public void onRead(SelectionKey key) {
 
 
-            Reference<ByteBuffer> byteBufferReference = null;
+            ByteBuffer byteBufferReference = null;
             try {
                 Object[] p = (Object[]) key.attachment();
 
@@ -285,24 +285,23 @@ public enum HttpMethod {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
+                    byteBufferReference = (ByteBuffer.allocateDirect(1024));
                     try {
-                        final ByteBuffer buffer = byteBufferReference.get();
-                        final int i = channel.read(buffer);
+                        final int i = channel.read(byteBufferReference);
 
-                        buffer.flip().mark();
+                        byteBufferReference.flip().mark();
 
                         for (final HttpMethod httpMethod : HttpMethod.values())
-                            if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
+                            if (httpMethod.recognize((ByteBuffer) byteBufferReference.reset())) {
                                 //System.out.println("found: " + httpMethod);
-                                key.attach(buffer);
+                                key.attach(byteBufferReference);
 
                                 httpMethod.onAccept(key);
                                 return;
                             }
 
                         response(key, HttpStatus.$400);
-                        channel.write(buffer);
+                        channel.write(byteBufferReference);
                     } catch (Throwable e) {
                         e.printStackTrace();
                     } finally {
@@ -463,9 +462,9 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final Reference<ByteBuffer> byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
+        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1024));
         try {
-            final ByteBuffer buffer = byteBufferReference.get();
+            final ByteBuffer buffer = byteBufferReference;
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append("\r\n").flip();
 
             final ByteBuffer out = UTF8.encode(charBuffer);
@@ -482,12 +481,10 @@ public enum HttpMethod {
         throw new UnsupportedOperationException();
     }
 
-  
 
     public void onAccept(SelectionKey key) {
         throw new UnsupportedOperationException();
     }
 
- 
- 
+
 }

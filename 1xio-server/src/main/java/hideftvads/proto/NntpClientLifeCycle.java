@@ -3,7 +3,6 @@ package hideftvads.proto;
 import alg.*;
 
 import java.io.*;
-import java.lang.ref.*;
 import java.net.*;
 import java.nio.*;
 import java.nio.channels.*;
@@ -23,18 +22,17 @@ public enum NntpClientLifeCycle {
          * read a status code, update Session, replace self.
          */
         public void onRead(SelectionKey selectionKey) {
-            final Reference<ByteBuffer> ref = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
+            final ByteBuffer ref = (ByteBuffer.allocateDirect(1024));
             try {
-                final ByteBuffer buffer = ref.get();
 
                 final SocketChannel c = (SocketChannel) selectionKey.channel();
                 int count = -1;
                 do {
                     try {
-                        count = c.read(buffer);
+                        count = c.read(ref);
                         if (count > 0) {
                             System.err.println("read " + count);
-                            final CharBuffer charBuffer = ProtoUtil.UTF8.decode((ByteBuffer) buffer.flip());
+                            final CharBuffer charBuffer = ProtoUtil.UTF8.decode((ByteBuffer) ref.flip());
                             System.err.println(charBuffer);
                             if (charBuffer.toString().startsWith("200 ")) {
                                 final int desiredOps = SelectionKey.OP_WRITE;

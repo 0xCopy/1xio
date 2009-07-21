@@ -33,9 +33,9 @@ public class ProtoUtil {
 
 
 //    static synchronized public void refill(final int slot) {
-//        Queue<Reference<ByteBuffer>> queue = buffers[slot];
+//        Queue<ByteBuffer> queue = buffers[slot];
 //        if (queue == null) {
-//            queue = buffers[slot] = new ConcurrentLinkedQueue<Reference<ByteBuffer>>();
+//            queue = buffers[slot] = new ConcurrentLinkedQueue<ByteBuffer>();
 //        }
 //
 //        if (queue.isEmpty()) {
@@ -49,7 +49,7 @@ public class ProtoUtil {
 //
 //                buffer.limit(newPosition);
 //
-//                queue.add(new SoftReference<ByteBuffer>(buffer.slice()));
+//                queue.add((buffer.slice()));
 //                plus();
 //                buffer.position(newPosition);
 //            }

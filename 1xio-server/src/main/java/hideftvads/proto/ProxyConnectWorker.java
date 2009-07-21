@@ -3,7 +3,6 @@ package hideftvads.proto;
 import alg.*;
 import javolution.text.*;
 
-import java.lang.ref.*;
 import java.net.*;
 import java.nio.*;
 import java.nio.channels.*;
@@ -52,7 +51,7 @@ class ProxyConnectWorker implements Callable {
     public Object call() throws Exception {
 
 //            final Object x = new Object();
-//            final Reference<ByteBuffer>[] br = new Reference[1];
+//            final ByteBuffer[] br = new Reference[1];
         if (!sc.finishConnect()) {
             return this;
         }
@@ -62,10 +61,10 @@ class ProxyConnectWorker implements Callable {
         final String spec = path.toString();
         final String s = new URL(spec).getFile();
         System.err.println("requesting " + s);
-        final Reference<ByteBuffer> byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
+        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1024));
 
         try {
-            final ByteBuffer b = (ByteBuffer) byteBufferReference.get().clear();
+            final ByteBuffer b = (ByteBuffer) byteBufferReference. clear();
             if (HttpMethod.USE_HTTP_PASSTHROUGH) {
                 b.put(ProtoUtil.UTF8.encode("GET " + s + " "));
 
@@ -134,12 +133,13 @@ class ProxyConnectWorker implements Callable {
     }
 
     private void chain(SelectionKey in, SelectionKey out) {
-        in.interestOps(OP_READ);
-        out.interestOps(0);
+     
 
-        final BlockingQueue<Reference<ByteBuffer>> q = new LinkedBlockingQueue<Reference<ByteBuffer>>(3);
-        ProtoUtil.threadPool.submit(new ProxyWriteWorker(this, q));
+        final  Queue<ByteBuffer> q = new ConcurrentLinkedQueue<ByteBuffer>( );
+//        ProtoUtil.threadPool.submit(new ProxyWriteWorker(this, q));
         in.attach(new ProxyReadWorker(this, q));
-    }
+        out.attach(new ProxyWriteWorker(this, q));
+      in.interestOps(OP_READ);
+        out.interestOps(OP_WRITE); }
 
 }

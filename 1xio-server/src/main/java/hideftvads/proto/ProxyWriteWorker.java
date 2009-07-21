@@ -1,10 +1,9 @@
 package hideftvads.proto;
 
-import java.lang.ref.*;
+import java.io.*;
 import java.nio.*;
 import java.nio.channels.*;
-import java.util.concurrent.*;
-import java.io.*;
+import java.util.*;
 
 /**
  * User: jim
@@ -12,39 +11,52 @@ import java.io.*;
  * Time: 12:05:38 AM
  */
 class ProxyWriteWorker implements Runnable {
-    private final BlockingQueue<Reference<ByteBuffer>> q;
+    private final Queue<ByteBuffer> q;
     private ProxyConnectWorker proxyConnectWorker;
- 
-    public ProxyWriteWorker(ProxyConnectWorker proxyConnectWorker, BlockingQueue<Reference<ByteBuffer>> q) {
-         this.proxyConnectWorker = proxyConnectWorker;
+    public ByteBuffer br;
+
+    public ProxyWriteWorker(ProxyConnectWorker proxyConnectWorker, Queue<ByteBuffer> q) {
+        this.proxyConnectWorker = proxyConnectWorker;
         this.q = q;
     }
 
-
     @Override
     public void run() {
-        do {
-            Reference<ByteBuffer> br = null;
+//        do {
+        if (br == null || !br.hasRemaining()) {
             try {
-                br = q.take();
-                if(br==null)  throw new  Exception();
-                ByteBuffer b = br.get();             
-                while (b.hasRemaining()) {
-                    final int i = ((SocketChannel) proxyConnectWorker.client.channel()).write(b);
-//                    System.err.println("wrote " + i);
-                }
-            } catch ( Exception e) {
-                proxyConnectWorker.client.cancel();
-                proxyConnectWorker.srv.cancel();
-                try {
-                    proxyConnectWorker.client.channel().close();
+                br = q.remove();
+                if (br == null) {
+                   
+                    proxyConnectWorker.srv.cancel();
+                    proxyConnectWorker.client.cancel();
                     proxyConnectWorker.srv.channel().close();
-                } catch (IOException e1) {
-//                    e1.printStackTrace();  //TODO: Verify for a purpose
+                    proxyConnectWorker.client.channel().close();
+                    
+                    return;
                 }
-//                e.printStackTrace();  //TODO: Verify for a purpose
-            } finally {
+            } catch (Exception e) {
+                proxyConnectWorker.client.interestOps(0);
+                return;
             }
-        } while (proxyConnectWorker.client.isValid());
+        }
+        try {
+//            br = br;
+//            if (br == null) throw new Exception();
+            final int i = ((SocketChannel) proxyConnectWorker.client.channel()).write(br);
+                    System.err.println("wrote " + i);
+        } catch (Exception e) {
+            proxyConnectWorker.client.cancel();
+            proxyConnectWorker.srv.cancel();
+            try {
+                proxyConnectWorker.client.channel().close();
+                proxyConnectWorker.srv.channel().close();
+            } catch (IOException e1) {
+//                    e1.printStackTrace();  //TODO: Verify for a purpose
+            }
+//                e.printStackTrace();  //TODO: Verify for a purpose
+        } finally {
+        }
+//        } while (proxyConnectWorker.client.isValid());
     }
 }
