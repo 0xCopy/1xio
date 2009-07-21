@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Class-Path: tools/tools.jar
-Main-Class: org.jtorrent.installer.Installer
