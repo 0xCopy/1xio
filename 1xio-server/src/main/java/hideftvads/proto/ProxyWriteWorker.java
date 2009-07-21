@@ -28,14 +28,14 @@ class ProxyWriteWorker implements Runnable {
                 br = q.remove();
                 if (br == null) {
 
-                    proxyConnectWorker.srv.cancel();
-                    proxyConnectWorker.client.cancel();
                     proxyConnectWorker.srv.channel().close();
                     proxyConnectWorker.client.channel().close();
 
+                    proxyConnectWorker.srv.cancel();
+                    proxyConnectWorker.client.cancel();
                     return;
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 proxyConnectWorker.client.interestOps(0);
                 ProtoUtil.timer.schedule(new TimerTask() {
                     @Override
@@ -52,7 +52,7 @@ class ProxyWriteWorker implements Runnable {
 //            br = br;
 //            if (br == null) throw new Exception();
             final int i = ((SocketChannel) proxyConnectWorker.client.channel()).write(br);
-            System.err.println("wrote " + i);
+//            System.err.println("wrote " + i);
         } catch (Exception e) {
             proxyConnectWorker.client.cancel();
             proxyConnectWorker.srv.cancel();
