@@ -1,0 +1,96 @@
+
+0. Introduction
+
+Thank you for downloading JTorrent! We appreciate your support.
+
+This software is a Java port of BitTorrent 3.0.2.
+
+This software is in the alpha stages.
+
+1. System requirements
+
+Because of the advanced functionality used by the software, it requires
+a Java* Runtime Environment (JRE) from the Java 2 Platform, Standard
+Edition (J2SE) version 1.4.0 or higher. If you have not already installed
+a JRE, please visit
+
+	http://java.sun.com/downloads/
+
+Please select an appropriate J2SE, and download the JRE for your computer
+operating system. You do not need the SDK.
+
+2. Installation
+
+To run the installer, open a command prompt in the appropriate directory
+and enter
+
+java -jar installer.jar 
+
+or
+
+java -jar installer.jar [directory where to install JTorrent]
+
+The installer will create the following files and directories:
+
+build.xml           -- the Second Stage installer build file.
+classes             -- all the class files needed by the application
+config.cfg          -- the JTorrent configuration file
+ICE_JNIRegistry.dll -- .dll needed to edit the windows registry
+README.client       -- this file
+test.torrent        -- a test .torrent file
+
+If the install target computer is Windows*, the installer adds entries to the
+Windows registry for the application/x-bittorrent MIME type so the browser
+will launch bittorrent when it sees a .torrent file.
+
+If the install target computer is *NIX, it will add an application/x-bittorrent
+entry to the /etc/mailcap file.  
+
+3. Running the program
+
+3.1 HTTP
+
+The installer associates the JTorrent program with the application/x-bittorrent
+MIME type, so clicking on a link to a .torrent file will launch JTorrent.
+
+3.2 Manually running
+
+The following Java main entry points exist:
+
+org.jtorrent.installer.Installer -- starts the installer
+org.jtorrent.installer.Uninstall -- removes the bittorrent application
+org.jtorrent.msgdata.MakeBitTorrentFile -- makes the .torrent file
+org.jtorrent.ptop.Origin -- starts the first peer of a bittorrent network, usually only run along side of a tracker
+org.jtorrent.plugin.HeadlessPlugin -- starts a command line bittorrent peer
+org.jtorrent.plugin.Plugin -- starts the GUI bittorrent peer, launched by the browser to handle .torrent files
+
+To run any of these, open a command prompt in the install directory, and type
+
+java -cp classes org.jtorrent.msgdata.MakeBitTorrentFile (for example)
+
+Each entry point is documented with a usage message.
+
+4. Project status and Disclaimer
+
+This is alpha code. No warranty of any kind is expressed or implied.
+
+Currently Mac OSX isn't supported because the 1.4 JVM hasn't been released.
+
+Pre OSX Mac OSes are not supported because of their lack of 1.4 JVM support.
+
+5. Support
+
+This project is a collaborative effort. If you need support, or if you'd like
+to help us make this project the best it can be, please visit
+
+	http://sourceforge.net/projects/jtorrent/
+
+There are several fora and mailing lists set up, all of which are monitored
+daily. You can expect a reply to your questions within 24-48 hours.
+
+Thanks again for trying out JTorrent!
+
+6. Legal*
+
+The trademark Java and its derivatives are registered to Sun Microsystems.
+The trademark Windows and its derivatives are registered to Microsoft Corp.

@@ -1,0 +1,170 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><html><head><title>Design Specification for JTorrent beta</title><base href="file:///home/hunter/cvstest/jtorrent/docs/design.html"></head>
+
+  <body>
+    <h1>Design Specification for JTorrent client beta</h1>
+
+    <h2>Introduction</h2>
+
+    This is the first draft of the design specification for JTorrent client.  JTorrent is a Java
+    implementation of client for the bittorrent protocol.  This document is divided into four 
+    parts: Network IO, Disk IO, Browser-client interaction, and GUI.  
+    This document is intented as a development roadmap for the JTorrent developers to follow.
+    If you have any questions about this design or how to become a JTorrent developer contact
+    Dave Blue flick boy@sourceforge . net at or Hunter Payne at sfcat @ sourceforge . net
+    (thank the spammers for the spaces in the email)
+
+    <h2>Network IO</h2>
+    One client is expected to handle several file transfers for several .torrent files at once.  
+    Because of this, a separate ConnectionManager on a separate port must be created to handle
+    each .torrent file.  The network IO code is based upon the java.nio.* packages from Javasoft.
+    One main thread in the ConnectionManager is responsible for all reading and writing done by 
+    the client for each file transfer.  When the network is ready to read or write, control is 
+    passed to correct ConnectionManager by the JVM using a selector.  Then the Connection object 
+    for the peer/socket in question is called to perform the IO operation.  Each Connection object
+    represents one socket connection to one peer for one file transfer.
+    <p />
+    When a socket connection is accepted it is passed to ConnectionFactory to perform the handshake
+    and construct the correct Connection object.  It is expected that the there will only be one 
+    implementation of Connection for a long time.  After the Connection is constructed, it will
+    handle all socket communications for the lifetime of the socket.  The reading and writing
+    of the protocol messages are handled in the current Connection implementation by two classes 
+    in msgdata, ProtocolParser and ProtocolMessageFormatter.  There are interfaces in msgdata 
+    called, IMessageReceiver and IMessageFormatter which hardcode the current BitTorrent protocol.
+    For more information on the BitTorrent protocol 
+    <a href="http://www.bitconjurer.org/BitTorrent/protocol.html">click here</a>.
+    <p />
+    All passing of protocol messages is carried out using the interfaces in msgdata.  Above the
+    ConnectionManager are the Downloader, SingleDownloader, Choker, and Uploader classes.  The 
+    Downloader controls one download file transfer and the Uploader controls one file's upload to 
+    one other peer.  A singleton Choker object controls the upload choker states of the various 
+    connection objects for a single peer across multiple file transfers.  The code that 
+    buffers the sending of a message into a queue to be handled later is currently in Connection.
+    We need to abstract it into a separate class which implements IMessageReceiver and sends the 
+    protocol messages to a IProtocolFormatter in a serial fashion later on by calling flush().  
+    We can then use this class in both the Connection(to receive from Connection and buffer to the
+    ProtocolMessageFormatter) to handling writing to the socket and by the Connection(to receive 
+    from the ProtocolParser and pass to an upper level delegate class) to handle notifying classes 
+    on other threads that a protocol message has been received.  The delegate object for this 
+    connection, on another thread, would then pass the calls to the correct Uploader or 
+    SingleDownloader for the connection object with which the delegate is associated.  
+    Each Downloader has has a collection of SingleDownloader objects which manage the 
+    download of a specific file transfer over one socket and one Connection
+    object.  Each single downloader handles all downloading protocol messages received on a specific
+    socket.  Each socket will also have an Uploader to handle all uploading protocol messages 
+    received on a specific socket.  Each Downloader will have its own thread for handling the 
+    messages received by each SingleDownloader and Uploader.
+    <p />
+    <h3>Networking and TCP behavior</h3>
+From Bram's site:     &quot;When data is being transferred, downloaders
+should keep several piece requests queued up at once in order to get
+good TCP performance (this is called 'pipelining'.) On the other side,
+requests which can't be written out to the TCP buffer immediately
+should be queued up in memory rather than kept in an application-level
+network buffer, so they can all be thrown out when a choke happens." 
+This is implemented by storing messages in a writeQueue object
+maintained by the Connection     object.  When a choke is received,
+all messages in the writeQueue are dropped.  When it is time     to
+write to the network, we write up to a configurable amount of bytes to
+the socket channel     from the writeQueue object.  It is the
+Downloader's job to ensure an appropiate amount of     connections are
+unchoked and sending data to the sockets(for pipelining). 
+
+    <h2>Disk IO</h2>
+    When one file transfer is in progress, whether it be uploading or downloading, or both, 
+    a single IStorage object is responsible for reading data from and writing data to a file or a 
+    collection of files as needed.  Another class called HashCheckStore checks and
+    computes hash codes for each piece. It also wraps and implements the IStorage interface.  There
+    is one HashCheckStore for each file transfer.  A ScatteringByteChannel might be used to 
+    allow the DirectoryStore to be represented as one MappedByteBuffer.  It is important to
+    keep byte arrays created by the ProtocolParser from being copied before being written to
+    disk.
+
+    <h2>Browser-client interaction</h2>
+    The JTorrent client is intended as a background or daemon process which receives requests to
+    start downloading a specified .torrent file.  The client then handles displaying a 
+    GUI, and everything else.  The client will have a localhost server socket to accept connections
+    from a very small piece of Java code which writes the location of the .torrent file to
+    the socket connection using a HTTP style request.  This allows for one GUI to handle downloading
+    of multiple files by one process without having to restart the JVM each time.  
+    <p />
+    Ex: GET http://somehome.com/some.torrent\n
+    <p />
+    If the browser interaction client(the very small piece of code) doesn't find a daemon client
+    then it should restart the daemon client.  Then we need to add an additional parameter to
+    the .torrent file format.  This parameter, if present, will tell the client to display this
+    file in the browser when the download is complete.
+    <p />
+    As a side note, it is rediculous that Sun doesn't realize that the reason Java isn't good for
+    client apps or applets is because the JRE takes too long to start and the benifits of the 
+    JIT are removed because the classes must be recompiled each time the JRE restarts.  Running
+    one JRE per machine and allowing it to, in a secure way, run multiple Java processes is the
+    single most important feature that needs to be added to Java.  This entire section is basically
+    a work around until that feature is added
+
+<!--    <h2>TSM and download management</h2>
+    TSM stands for transfer state machine.  Basically it represents the state of a bittorrent peer
+    connection.  The new TSM class of a peer connection needs to handle
+    the following boolean states, uploader-choked, downloader-choked, uploader-interested, 
+    downloader-interested, endgame and receivedHandshake.  It also needs
+    to contain a reference to the bitfield with the current state of the file transfer.  The 
+    Connection object is responsible for updating the state of the TSM object.  The TSM should be 
+    exposed by the Connection object for use by the upper level protocol control classes(Uploader, 
+    Downloader, SingleDownloader, and Choker).  Choker messages go from the Uploader to the 
+    Downloader.  Interested messages go from the Downloader to the Uploader.  Each side of the
+    Connection has an uploader and possibly a downloader.  Each of the uploader and downloader
+    objects has a representive choked and interested bit.  The choked bit represents the readyness 
+    of a upload peer to upload.  The interested bit represents the readyness of a downloader to
+    download.  The choke messages are choke(true) and unchoke(false).  The interest messages are
+    interested(true) and not interested(false).
+    <p />
+    Ex: When a choked message goes from peer1 to peer2, the message is going from an
+    uploader to a downloader because it is a choked message.  So peer1 would set the uploader-choked
+    bit, then send the message, then peer2 would set the downloader-choked bit when the message
+    was received.
+    <p />
+    Another Ex: When an interest message goes from peer1 to peer2, the message is going from an
+    downloader to a uploader because it is an interest message.  So peer1 would set the 
+    downloader-choked bit, then sends the message, then peer2 would set the uploader-choked bit when
+    the message was received.
+    <p />
+    The TSM would also have to be notified when the number of successfully downloaded pieces 
+    changes.
+-->
+    <h2>GUI and user interaction</h2>
+    The main interface which abstracts the user's control is IMonitor.  It allows for the user
+    to start/stop/pause/cancel a download and to monitor the status of the download.  
+    To be completed...
+
+    <h2>Conclusion and current Status</h2>
+    The current jtorrent alpha implementation needs some refactoring to bring it up to spec with
+    respect to this document and the newest version of BitTorrent.  I've been going back and forth
+    on the issue of using a TSM, or letting the losely defined ported classes(Uploader, 
+    Downloader, etc) control the choked and interested state of the connection.  
+    <p />
+    Here is a short list of the changes which need to be made in no specific order
+
+    <ul>
+      <li>Add a ConnectionFactory object</li>
+      <li>move all code which causes writes above the ConnectionManager(specifically a call to 
+	Connection.sendBitfield() in ConnectionManager)</li>
+      <li>Create a ProtocolMessageBuffer from Connection and use it in the Connect to buffer writes to the socket and notifications to upper level classes(Downloader, etc)</li>
+      <li>Separate protocol message handling onto the thread controlled by the Downloader class</li>
+      <li>Move all references to uploader and downloader above the Connection, and ConnectionManager classes</li>
+      <li>Re-port the newest version BitTorrent into the Choker, Uploader, Downloader, and SingleDownloader classes</li>
+      <li>Improve the GUI</li>
+      <li>Integrate the new KickoffServer into the plugin so that if the GUI starts, the KickoffServer starts</li>
+      <li>Make the plugin try to construct the KickoffClient and if the constructor throws an IOException, then and only then start the plugin</li>
+      <li>Improve control of a download by the user</li>
+      <li>Add a new parameter to the torrent file format for to allow the client to
+display a specified HTML page after the download is finished</li>
+      <li>Add code to control a web browser to support the new parameter</li>
+      <li>Create an apache module that automagically creates .torrents and sends them to
+users with a specified accept-types: when server load gets high</li>
+    </ul>
+
+    <hr>
+<!-- Created: Tue Jun 10 20:15:08 EDT 2003 -->
+<!-- hhmts start -->
+Last modified: Thu Jun 12 23:58:53 EDT 2003
+<!-- hhmts end -->
+  </body></html>

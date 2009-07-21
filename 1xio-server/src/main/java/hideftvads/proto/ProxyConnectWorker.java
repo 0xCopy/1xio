@@ -62,7 +62,7 @@ class ProxyConnectWorker implements Callable {
         final String spec = path.toString();
         final String s = new URL(spec).getFile();
         System.err.println("requesting " + s);
-        final Reference<ByteBuffer> byteBufferReference = hideftvads.proto.ProtoUtil.borrowBuffer();
+        final Reference<ByteBuffer> byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
 
         try {
             final ByteBuffer b = (ByteBuffer) byteBufferReference.get().clear();
@@ -92,7 +92,11 @@ class ProxyConnectWorker implements Callable {
                         final ByteBuffer byteBuffer = (ByteBuffer) buffer.position(line.$1());
                         b.put(byteBuffer);
                     } catch (Throwable e) {
-                        b.put((ByteBuffer) src.clear().position(line.$1()));
+                        try {
+                            b.put((ByteBuffer) src.clear().position(line.$1()));
+                        } catch (Throwable e1) {
+//                            e1.printStackTrace();  //TODO: Verify for a purpose
+                        }
                     }
 
                 }
@@ -125,7 +129,6 @@ class ProxyConnectWorker implements Callable {
         } catch (Throwable e) {
             e.printStackTrace();
         } finally {
-                 ProtoUtil.recycle(byteBufferReference);
         }
         return null;
     }

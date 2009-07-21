@@ -78,7 +78,7 @@ public enum HttpMethod {
                             final SocketChannel channel = (SocketChannel) key.channel();
                             final fileXfer xfer = new fileXfer(fc, path);
                             response(key, $200);
-                            final Reference<ByteBuffer> byteBufferReference = borrowBuffer(DEFAULT_EXP);
+                            final Reference<ByteBuffer> byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
                             try {
                                 final ByteBuffer buffer1 = byteBufferReference.get();
                                 MimeType mimeType = null;
@@ -95,7 +95,6 @@ public enum HttpMethod {
                                 key.interestOps(SelectionKey.OP_WRITE);
                             } catch (Exception ignored) {
                             } finally {
-                                recycle(byteBufferReference, DEFAULT_EXP);
                             }
                             return;
                         }
@@ -286,7 +285,7 @@ public enum HttpMethod {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    byteBufferReference = borrowBuffer(DEFAULT_EXP);
+                    byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
                     try {
                         final ByteBuffer buffer = byteBufferReference.get();
                         final int i = channel.read(buffer);
@@ -307,7 +306,6 @@ public enum HttpMethod {
                     } catch (Throwable e) {
                         e.printStackTrace();
                     } finally {
-                        recycle(byteBufferReference, DEFAULT_EXP);
                     }
                     channel.close();
                     return;
@@ -465,7 +463,7 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final Reference<ByteBuffer> byteBufferReference = borrowBuffer(DEFAULT_EXP);
+        final Reference<ByteBuffer> byteBufferReference = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
         try {
             final ByteBuffer buffer = byteBufferReference.get();
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append("\r\n").flip();
@@ -476,7 +474,6 @@ public enum HttpMethod {
             ((SocketChannel) key.channel()).write(out);
         } catch (Exception ignored) {
         } finally {
-            recycle(byteBufferReference, DEFAULT_EXP);
         }
 
     }

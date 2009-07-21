@@ -44,7 +44,6 @@ class ProxyWriteWorker implements Runnable {
                 }
 //                e.printStackTrace();  //TODO: Verify for a purpose
             } finally {
-                ProtoUtil.recycle(br);
             }
         } while (proxyConnectWorker.client.isValid());
     }

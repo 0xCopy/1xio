@@ -23,7 +23,7 @@ public enum NntpClientLifeCycle {
          * read a status code, update Session, replace self.
          */
         public void onRead(SelectionKey selectionKey) {
-            final Reference<ByteBuffer> ref = ProtoUtil.borrowBuffer(ProtoUtil.DEFAULT_EXP);
+            final Reference<ByteBuffer> ref = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
             try {
                 final ByteBuffer buffer = ref.get();
 
@@ -98,7 +98,6 @@ public enum NntpClientLifeCycle {
                     }
                 } while (count > 0);
             } finally {
-                ProtoUtil.recycle(ref, ProtoUtil.DEFAULT_EXP);
             }
         }
     }, LIST {

@@ -24,7 +24,7 @@ class ProxyReadWorker implements Runnable {
     @Override
     public void run() {
         synchronized (proxyConnectWorker) {
-            final Reference<ByteBuffer> br = ProtoUtil.borrowBuffer();
+            final Reference<ByteBuffer> br = new SoftReference<ByteBuffer>(ByteBuffer.allocateDirect(1024));
             final ByteBuffer b = br.get();
             final SocketChannel is = (SocketChannel) proxyConnectWorker.srv.channel();
             final int remaining = q.remainingCapacity();
