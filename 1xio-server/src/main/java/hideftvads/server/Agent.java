@@ -45,6 +45,7 @@ public class Agent {
 
                 try {
                     serverSocketChannel = ServerSocketChannel.open();
+                    serverSocketChannel.socket().setPerformancePreferences(0, 1, 2);
                     serverSocketChannel.socket().bind(new InetSocketAddress(port));
                     serverSocketChannel.configureBlocking(false);
                     final SelectionKey listenerKey = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);

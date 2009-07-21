@@ -55,7 +55,8 @@ public enum HttpMethod {
                     final InetSocketAddress remote = new InetSocketAddress(uri.getHost(), port);
                     final SocketChannel sc = SocketChannel.open();
                     sc.configureBlocking(false);
-                    sc.socket().setSoTimeout(30000);
+                    sc.socket().setKeepAlive(false);
+//                    sc.socket().
                     sc.socket().setPerformancePreferences(0,1, 2);
                     sc.socket().setTcpNoDelay(true);
                     sc.connect(remote);

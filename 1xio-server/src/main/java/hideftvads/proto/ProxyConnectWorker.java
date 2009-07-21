@@ -72,7 +72,7 @@ class ProxyConnectWorker implements Callable {
             } else {
 
 
-                b.put(ProtoUtil.UTF8.encode("GET " + s + " HTTP/1.0\r\nConnection: close\r\n"));
+                b.put(ProtoUtil.UTF8.encode("GET " + s + " HTTP/1.1\r\nConnection: close\r\n"));
 
 //                b.put((ByteBuffer) src.limit(lines.get(1).$1()).position(lines.getFirst().$2().get(1)));
                 lines.removeFirst();

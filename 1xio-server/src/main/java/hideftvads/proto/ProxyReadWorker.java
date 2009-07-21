@@ -24,7 +24,7 @@ class ProxyReadWorker implements Runnable {
         {
             final ByteBuffer br = (ByteBuffer.allocateDirect(1448*5));
             final SocketChannel is = (SocketChannel) proxyConnectWorker.srv.channel();
-            final int remaining = 16 - q.size();
+            final int remaining = 128 - q.size();
             if (remaining >= 1) {
                 int i = 0;
                 try {
@@ -34,7 +34,7 @@ class ProxyReadWorker implements Runnable {
                         q.add(null);
                     } else if (0 < i) {
                         br.flip();
-                        q.add(br);
+                        q.add(br);                                       
                         proxyConnectWorker.client.interestOps(SelectionKey.OP_WRITE);
                     }
                 } catch (IOException e) {
