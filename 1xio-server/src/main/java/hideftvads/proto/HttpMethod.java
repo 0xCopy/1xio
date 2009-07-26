@@ -55,14 +55,13 @@ public enum HttpMethod {
                     final InetSocketAddress remote = new InetSocketAddress(uri.getHost(), port);
                     final SocketChannel sc = SocketChannel.open();
                     sc.configureBlocking(false);
-                    sc.socket().setKeepAlive(false);
-//                    sc.socket().
-                    sc.socket().setPerformancePreferences(0,1, 2);
-                    sc.socket().setTcpNoDelay(true);
+                    final Socket socket = sc.socket();
+                    socket.setKeepAlive(true); 
+                    socket.setPerformancePreferences(1, 9999,0); 
+                    socket.setTcpNoDelay(true);
+                    socket.setReceiveBufferSize(512);
                     sc.connect(remote);
-
                     final SelectionKey proxy = sc.register(key.selector(), SelectionKey.OP_CONNECT);
-
                     proxy.attach(new ProxyConnectWorker(sc, lines, path, src, proxy, key));
                     key.interestOps(0);
                     return;
@@ -100,17 +99,17 @@ public enum HttpMethod {
                             return;
                         }
                     } catch (Throwable e) {
-                        e.printStackTrace();
+//                        e.printStackTrace();
                     }
                 }
                 try {
                     response(key, $404);
                     key.cancel();
                 } catch (IOException e) {
-                    e.printStackTrace();
+//                    e.printStackTrace();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();  //TODO: verify for a purpose
+            } catch (Throwable e) {         key.cancel();
+//                e.printStackTrace();  //TODO: verify for a purpose
             }
 
         }
@@ -341,10 +340,13 @@ public enum HttpMethod {
 
     boolean recognize(ByteBuffer request) {
 
-        if (isWhitespace(request.get(margin)))
-            for (int i = 0; i < margin - 1; i++)
-                if (request.get(i) != token.get(i))
-                    return false;
+        try {
+            if (isWhitespace(request.get(margin)))
+                for (int i = 0; i < margin - 1; i++)
+                    if (request.get(i) != token.get(i))
+                        return false;
+        } catch (Throwable e) {
+        }
         return true;
     }
 
@@ -479,12 +481,14 @@ public enum HttpMethod {
     }
 
     public void onWrite(SelectionKey key) {
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
+        key.cancel();
     }
 
 
     public void onAccept(SelectionKey key) {
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
+        key.cancel();
     }
 
 

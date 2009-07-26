@@ -4,11 +4,10 @@
   <parent>
     <artifactId>1xio-parent</artifactId>
     <groupId>hideftvads</groupId>
-    <version>0.0.6</version>
+    <version>0.0.7</version>
   </parent>
   <groupId>hideftvads</groupId>
   <artifactId>1xio-dnsjava</artifactId>
-  <version>0.0.6</version>
   <name>1xio-dnsjava</name>
   <url>http://maven.apache.org</url>
   <dependencies>

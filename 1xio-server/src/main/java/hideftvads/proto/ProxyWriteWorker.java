@@ -40,7 +40,9 @@ class ProxyWriteWorker implements Runnable {
                 ProtoUtil.timer.schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        proxyConnectWorker.client.interestOps(SelectionKey.OP_WRITE);
+                        try {
+                            proxyConnectWorker.client.interestOps(SelectionKey.OP_WRITE);
+                        }catch(Throwable e){}  
 
 
                     }

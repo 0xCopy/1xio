@@ -46,7 +46,14 @@ class ProxyReadWorker implements Runnable {
                         client.interestOps(SelectionKey.OP_WRITE);
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();  //TODO: Verify for a purpose
+//                    e.printStackTrace();  //TODO: Verify for a purpose
+                    client.cancel();
+                    srv.cancel();
+                    try {
+                        client.channel().close();
+                        srv.channel().close();
+                    } catch (Throwable e1) {
+                     }
                 }
             } else {
                 System.err.println("squelching");
@@ -55,8 +62,13 @@ class ProxyReadWorker implements Runnable {
                 ProtoUtil.timer.schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        System.err.println("unsquelching");
-                        srv.interestOps(java.nio.channels.SelectionKey.OP_READ);
+                        try {
+                            System.err.println("unsquelching");
+                            srv.interestOps(SelectionKey.OP_READ);
+                        } catch (Throwable e) {
+//                            e.printStackTrace();  //TODO: Verify for a purpose
+                        } finally {
+                        }
                     }
                 }, 250);
             }
