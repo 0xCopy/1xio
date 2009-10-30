@@ -1,20 +1,26 @@
 package one.xio.proto;
 
-import static one.xio.proto.HttpStatus.*;
-import static one.xio.proto.ProtoUtil.*;
-
-import java.io.*;
-import static java.lang.Character.*;
-import java.net.*;
-import java.nio.*;
-import java.nio.channels.*;
-import static java.nio.channels.SelectionKey.*;
-import java.util.*;
-import java.util.concurrent.*;
-
+import alg.Pair;
 import javolution.text.Text;
 import javolution.util.FastMap;
-import alg.Pair;
+import static one.xio.proto.HttpStatus.*;
+import static one.xio.proto.ProtoUtil.UTF8;
+import static one.xio.proto.ProtoUtil.preIndex;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import static java.lang.Character.isWhitespace;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.channels.*;
+import static java.nio.channels.SelectionKey.OP_READ;
+import java.util.LinkedList;
+import java.util.Random;
+import java.util.concurrent.Callable;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -26,7 +32,7 @@ public enum HttpMethod {
     GET {
         public void onWrite(final SelectionKey key) {
             Object[] a = (Object[]) key.attachment();
-            fileXfer xfer = (fileXfer) a[1];
+            Xfer xfer = (Xfer) a[1];
             xfer.sendChunk(key);
         }
 
@@ -57,8 +63,8 @@ public enum HttpMethod {
                     final SocketChannel sc = SocketChannel.open();
                     sc.configureBlocking(false);
                     final Socket socket = sc.socket();
-                    socket.setKeepAlive(true); 
-                    socket.setPerformancePreferences(1, 9999,0); 
+                    socket.setKeepAlive(true);
+                    socket.setPerformancePreferences(1, 9999, 0);
                     socket.setTcpNoDelay(true);
                     socket.setReceiveBufferSize(512);
                     sc.connect(remote);
@@ -74,31 +80,71 @@ public enum HttpMethod {
                         name1.replaceAll("/..", "/.");
 
                         final RandomAccessFile fnode = new RandomAccessFile(name1, "r");
+                        final SocketChannel channel = (SocketChannel) key.channel();
 
+                        Xfer xfer = null;
+                        FileChannel fc = null;
                         if (fnode.getFD().valid()) {
-                            final FileChannel fc = fnode.getChannel();
-                            final SocketChannel channel = (SocketChannel) key.channel();
-                            final fileXfer xfer = new fileXfer(fc, path);
-                            response(key, $200);
-                            final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1500));
-                            try {
-                                MimeType mimeType = null;
-                                try {
-                                    mimeType = MimeType.valueOf(path.subtext(path.lastIndexOf(".") + 1).toString());
-                                } catch (Exception ignored) {
-                                }
-                                String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
-                                final CharBuffer c = (CharBuffer) byteBufferReference.asCharBuffer().append("Connection: close\n").append(mimeHeader).append("Content-Length: ").append(String.valueOf(fc.size())).append("\n\n").flip();
-                                channel.write(UTF8.encode(c));
+                            fc = fnode.getChannel();
+                            xfer = new FileXfer(fc, path);
+                        } else {
+                            final InputStream stream = ClassLoader.getSystemResourceAsStream(name1);
+
+                            if (stream != null)
+                                xfer = new Xfer() {
+
+                                    final ByteBuffer buf = ByteBuffer.allocateDirect(256);
+                                    final ReadableByteChannel src = Channels.newChannel(stream);
 
 
-                                key.attach(new Object[]{this, xfer});
-                                key.interestOps(SelectionKey.OP_WRITE);
-                            } catch (Exception ignored) {
-                            } finally {
-                            }
-                            return;
+                                    @Override
+                                    synchronized public void sendChunk(SelectionKey key) {
+                                        try {
+                                            final ByteBuffer buffer = (ByteBuffer) buf.clear();
+                                            final int i = src.read(buffer);
+//                                        final SocketChannel channel = (SocketChannel) key.channel();
+                                            if (i > -1) {
+
+                                                channel.write((ByteBuffer) buf.flip());
+                                                //noinspection UnnecessaryReturnStatement
+                                                return;
+                                            }
+                                        }
+                                        catch (IOException e) {
+                                            e.printStackTrace();  //Todo: verify for a purpose
+                                        } finally {
+                                            try {
+                                                key.channel().close();
+                                            } catch (IOException ignored) {
+                                            }
+                                            key.cancel();
+                                        }
+
+
+                                    }
+                                };
                         }
+                        response(key, $200);
+                        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1500));
+                        try {
+                            MimeType mimeType = null;
+                            try {
+                                mimeType = MimeType.valueOf(path.subtext(path.lastIndexOf(".") + 1).toString());
+                            } catch (Exception ignored) {
+                            }
+                            String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
+                            final CharBuffer c = (CharBuffer) byteBufferReference.asCharBuffer().append("Connection: close\n").append(mimeHeader).append(
+                                    fc == null ? "" : (new StringBuilder().append("Content-Length: ").append(String.valueOf(fc.size())).toString())
+                            ).append("\n\n").flip();
+                            channel.write(UTF8.encode(c));
+
+
+                            key.attach(new Object[]{this, xfer});
+                            key.interestOps(SelectionKey.OP_WRITE);
+                        } catch (Exception ignored) {
+                        } finally {
+                        }
+                        return;
                     } catch (Throwable e) {
 //                        e.printStackTrace();
                     }
@@ -109,13 +155,14 @@ public enum HttpMethod {
                 } catch (IOException e) {
 //                    e.printStackTrace();
                 }
-            } catch (Throwable e) {         key.cancel();
+            } catch (Throwable e) {
+                key.cancel();
 //                e.printStackTrace();  //TODO: verify for a purpose
             }
 
         }
 
-        class fileXfer {
+        class FileXfer extends Xfer {
             long progress;
             FileChannel fc;
             long creation = System.currentTimeMillis(),
@@ -124,7 +171,7 @@ public enum HttpMethod {
             public long chunk;
             private boolean pipeline = false;
 
-            void sendChunk(final SelectionKey key) {
+            public void sendChunk(final SelectionKey key) {
                 if (!fc.isOpen() || !key.isValid() || !key.channel().isOpen()) {
                     return;
                 }
@@ -185,7 +232,7 @@ public enum HttpMethod {
             }
 
 
-            public fileXfer(FileChannel fc, CharSequence name) {
+            public FileXfer(FileChannel fc, CharSequence name) {
                 this.fc = fc;
                 this.name = name;
                 completion = -1L;
@@ -205,6 +252,12 @@ public enum HttpMethod {
             }
 
 
+        }
+
+        abstract class Xfer {
+
+
+            abstract public void sendChunk(SelectionKey key)  ;
         }},
 
     POST, PUT, HEAD, DELETE, TRACE, CONNECT {
