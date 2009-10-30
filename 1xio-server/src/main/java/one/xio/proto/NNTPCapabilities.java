@@ -1,4 +1,4 @@
-package hideftvads.proto;
+package one.xio.proto;
 
 import java.nio.*;
 import java.net.*;

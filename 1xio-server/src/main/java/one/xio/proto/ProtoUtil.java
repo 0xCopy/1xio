@@ -1,6 +1,6 @@
-package hideftvads.proto;
+package one.xio.proto;
 
-import alg.*;
+import alg.Pair;
 
 import java.nio.*;
 import java.nio.charset.*;
@@ -72,8 +72,7 @@ public class ProtoUtil {
         final Integer seek = lines.getFirst().$2().get(1) + 1;
         int limit = lines.getFirst().$2().get(2) - 1;
         src.limit(limit).position(seek);
-        final CharBuffer buffer = UTF8.decode(src);
-        return buffer;
+        return UTF8.decode(src);
     }
 
     static LinkedList<Pair<Integer, LinkedList<Integer>>> preIndex(ByteBuffer src) {

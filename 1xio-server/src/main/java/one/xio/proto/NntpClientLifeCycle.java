@@ -1,6 +1,6 @@
-package hideftvads.proto;
+package one.xio.proto;
 
-import alg.*;
+import alg.Pair;
 
 import java.io.*;
 import java.net.*;

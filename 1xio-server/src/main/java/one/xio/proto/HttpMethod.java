@@ -1,10 +1,7 @@
-package hideftvads.proto;
+package one.xio.proto;
 
-import alg.*;
-import static hideftvads.proto.HttpStatus.*;
-import static hideftvads.proto.ProtoUtil.*;
-import javolution.text.*;
-import javolution.util.*;
+import static one.xio.proto.HttpStatus.*;
+import static one.xio.proto.ProtoUtil.*;
 
 import java.io.*;
 import static java.lang.Character.*;
@@ -14,6 +11,10 @@ import java.nio.channels.*;
 import static java.nio.channels.SelectionKey.*;
 import java.util.*;
 import java.util.concurrent.*;
+
+import javolution.text.Text;
+import javolution.util.FastMap;
+import alg.Pair;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html

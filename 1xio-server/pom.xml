@@ -3,16 +3,16 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>1xio-parent</artifactId>
-    <groupId>hideftvads</groupId>
+    <groupId>1xio</groupId>
     <version>0.0.7</version>
   </parent>
-  <groupId>hideftvads</groupId>
+  <groupId>1xio</groupId>
   <artifactId>1xio-server</artifactId>
   <name>1xio-server</name>
     <!--<version>0.0.4</version>-->
     <organization>
-        <name>HidefTVAds!</name>
-        <url>http://www.HidefTVAds.com</url>
+        <name>1xio!</name>
+        <url>http://www.1xio.com</url>
     </organization>
   <description>server of 1xio Terraformed... by jim@keyframe.localdomain... on x86_64 x86_64 GNU/Linux... for  FastMap,server... </description>
   <url>http://code.google.com/p/1xio</url>
@@ -23,17 +23,6 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <source>1.6</source>
-                    <target>1.6</target>
-                    <fork>true</fork>
-                    <meminitial>128m</meminitial>
-                    <maxmem>1024m</maxmem>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
                     <descriptorId>
@@ -41,22 +30,10 @@
                     </descriptorId>
                     <archive>
                         <manifest>
-                            <mainClass>hideftvads.server.Agent</mainClass>
+                            <mainClass>one.xio.server.Agent</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>javolution</groupId>
-                <artifactId>colapi</artifactId>
-                <version>1.0.0</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>colorize</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
       <!--<plugin>-->
         <!--<groupId>org.apache.maven.plugins</groupId>-->
@@ -93,7 +70,7 @@
             <version>1.0</version>
         </dependency><!--
         <dependency> <version>${parent.version}</version>
-            <groupId>hideftvads</groupId>
+            <groupId>one.xio</groupId>
             <artifactId>1xio-FastMap</artifactId>
         </dependency>
 -->
@@ -114,7 +91,7 @@
             <version>5.3.1</version>
         </dependency>
         <dependency>
-            <groupId>hideftvads</groupId>
+            <groupId>1xio</groupId>
             <artifactId>1xio-dnsjava
 	    </artifactId>
             <version>${parent.version}</version>

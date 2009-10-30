@@ -1,7 +1,6 @@
-package hideftvads.proto;
+package one.xio.proto;
 
-import alg.*;
-import javolution.text.*;
+import alg.Pair;
 
 import java.net.*;
 import java.nio.*;
@@ -9,6 +8,8 @@ import java.nio.channels.*;
 import static java.nio.channels.SelectionKey.*;
 import java.util.*;
 import java.util.concurrent.*;
+
+import javolution.text.Text;
 
 /**
  * User: jim
@@ -105,7 +106,7 @@ class ProxyConnectWorker implements Callable {
 
 
             /*
-                        System.err.println("to send: " + hideftvads.proto.ProtoUtil.UTF8.decode((ByteBuffer) b.rewind()));
+                        System.err.println("to send: " + one.xio.proto.ProtoUtil.UTF8.decode((ByteBuffer) b.rewind()));
                         System.err.println("to send: " + ci + ":" + b.get(ci - 4)
                                 + ":" + b.get(ci - 3)
                                 + ":" + b.get(ci - 2)

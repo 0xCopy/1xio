@@ -1,4 +1,4 @@
-package hideftvads.proto;
+package one.xio.proto;
 
 /**
  * <h1>HTTP Status Codes</h1>

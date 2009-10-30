@@ -1,4 +1,4 @@
-package hideftvads.proto;
+package one.xio.proto;
 
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
