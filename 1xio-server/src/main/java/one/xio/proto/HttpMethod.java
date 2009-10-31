@@ -7,9 +7,7 @@ import static one.xio.proto.HttpStatus.*;
 import static one.xio.proto.ProtoUtil.UTF8;
 import static one.xio.proto.ProtoUtil.preIndex;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import static java.lang.Character.isWhitespace;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -21,6 +19,9 @@ import static java.nio.channels.SelectionKey.OP_READ;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.logging.Logger;
+
+//import sun.nio.ch.SocketChannelImpl;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -33,7 +34,9 @@ public enum HttpMethod {
         public void onWrite(final SelectionKey key) {
             Object[] a = (Object[]) key.attachment();
             Xfer xfer = (Xfer) a[1];
-            xfer.sendChunk(key);
+
+                xfer.sendChunk(key);
+
         }
 
         /**
@@ -55,6 +58,7 @@ public enum HttpMethod {
                 src.limit(lines.getLast().$1());
 
                 if (path.startsWith(HTTP_PREFIX)) {
+                    Logger.getAnonymousLogger().info(HTTP_PREFIX + "is prefix of the request " + path);
                     URL uri = new URL(path.toString());
 
                     int port = uri.getPort();
@@ -73,57 +77,100 @@ public enum HttpMethod {
                     key.interestOps(0);
                     return;
                 } else {
+
+                    Logger.getAnonymousLogger().info("non proxy request for " + path);
+                    final SocketChannel channel = (SocketChannel) key.channel();
+
                     try {
 
                         String name1 = path.toString();
-                        if (name1.charAt(0) == '/') name1 = name1.substring(1);
-                        name1.replaceAll("/..", "/.");
+                        if (name1.charAt(0) == '/')
+                            name1 = name1.substring(1);
 
-                        final RandomAccessFile fnode = new RandomAccessFile(name1, "r");
-                        final SocketChannel channel = (SocketChannel) key.channel();
+                        while (name1.contains("/.."))
+                            name1.replaceAll("/..", "/.");
+
+                        final File file = new File(name1);
 
                         Xfer xfer = null;
                         FileChannel fc = null;
-                        if (fnode.getFD().valid()) {
-                            fc = fnode.getChannel();
-                            xfer = new FileXfer(fc, path);
+                        long contentLength = 0;
+                        File tempFile=null;
+                        if (
+                                file.exists() &&
+                                        file.isFile()) {
+                            Logger.getAnonymousLogger().info("creating file Xfer for " + path);
+                            final RandomAccessFile fnode = new RandomAccessFile(name1, "r");
+
+                            xfer = null;
+                            if (fnode.getFD().valid()) {
+                                fc = fnode.getChannel();
+                                xfer = new FileXfer(fc, path);
+                            }
                         } else {
-                            final InputStream stream = ClassLoader.getSystemResourceAsStream(name1);
+                            Logger.getAnonymousLogger().info("creating Classloader xfer for " + path);
 
-                            if (stream != null)
-                                xfer = new Xfer() {
+                            URL resource = null;
+                            try {
+                                resource = ClassLoader.getSystemClassLoader().getResource(name1);
+                                if (resource == null) {
+                                    Logger.getAnonymousLogger().info("failing over to " + name1);
+                                    resource = ClassLoader.getSystemClassLoader().getResource(name1);
+                                    if (null == resource) Logger.getAnonymousLogger().info("fail on " + name1);
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();  //Todo: verify for a purpose
+                            } finally {
+                                Logger.getAnonymousLogger().info("resource is " + resource.toExternalForm());
 
-                                    final ByteBuffer buf = ByteBuffer.allocateDirect(256);
-                                    final ReadableByteChannel src = Channels.newChannel(stream);
+                            }
+
+                            if (null != resource) {
+                                RandomAccessFile fnode;
+                                if ("file".equals(resource.getProtocol())) {
+                                    fnode = new RandomAccessFile(resource.getPath(), "r");
 
 
-                                    @Override
-                                    synchronized public void sendChunk(SelectionKey key) {
-                                        try {
-                                            final ByteBuffer buffer = (ByteBuffer) buf.clear();
-                                            final int i = src.read(buffer);
-//                                        final SocketChannel channel = (SocketChannel) key.channel();
-                                            if (i > -1) {
-
-                                                channel.write((ByteBuffer) buf.flip());
-                                                //noinspection UnnecessaryReturnStatement
-                                                return;
-                                            }
-                                        }
-                                        catch (IOException e) {
-                                            e.printStackTrace();  //Todo: verify for a purpose
-                                        } finally {
-                                            try {
-                                                key.channel().close();
-                                            } catch (IOException ignored) {
-                                            }
-                                            key.cancel();
-                                        }
-
+                                    if (fnode.getFD().valid()) {
+                                        fc = fnode.getChannel();
+                                        xfer = new FileXfer(fc, path);
 
                                     }
-                                };
+                                } else {
+
+                                    //workaround needed at present juncture jdk 1.6.16 -- jarfile urls will cause funky write breaks
+                                    //so we have to slam out a fast temp file and hook that up instead.  oh well.
+                                    tempFile = File.createTempFile("1xio", "1xio");
+                                    tempFile.deleteOnExit();
+                                    final FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
+                                    final InputStream inputStream = resource.openStream();
+                                    final byte[] bytes = new byte[16384];
+                                    int in = 0;
+                                    while (in > -1) {
+                                        in = inputStream.read(bytes);
+                                        if (in == -1)
+
+                                            fileOutputStream.close();
+                                        else
+                                            fileOutputStream.write(bytes, 0, in);
+
+                                    }
+                                    fnode = new RandomAccessFile(tempFile, "r");
+
+                                    if (fnode.getFD().valid()) {
+                                        fc = fnode.getChannel();
+                                        xfer = new FileXfer(fc, path);
+                                    }
+
+
+                                }
+                            }
+
+                            if (fc != null) contentLength = fc.size();
+                            Logger.getAnonymousLogger().info("xfer is " + xfer);
+
                         }
+                        Logger.getAnonymousLogger().info(name() + " binding xfer " + xfer);
                         response(key, $200);
                         final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1500));
                         try {
@@ -134,13 +181,21 @@ public enum HttpMethod {
                             }
                             String mimeHeader = mimeType == null ? "\n" : "Content-Type: " + mimeType.contentType + "\n";
                             final CharBuffer c = (CharBuffer) byteBufferReference.asCharBuffer().append("Connection: close\n").append(mimeHeader).append(
-                                    fc == null ? "" : (new StringBuilder().append("Content-Length: ").append(String.valueOf(fc.size())).toString())
+                                    contentLength < 1 ? "" : (new StringBuilder().append("Content-Length: ").append(String.valueOf(fc.size())).toString())
                             ).append("\n\n").flip();
                             channel.write(UTF8.encode(c));
 
 
-                            key.attach(new Object[]{this, xfer});
+                            final File tempFile1 = tempFile;
+                            key.attach(new Object[]{this, xfer, tempFile==null?null:new Runnable(){
+                                @Override
+                                public void run() {
+                                    ((File)tempFile1).delete();
+                                }
+                            }});
+
                             key.interestOps(SelectionKey.OP_WRITE);
+                            Logger.getAnonymousLogger().info("selectionKey " + key + " is now set for xfer " + xfer);
                         } catch (Exception ignored) {
                         } finally {
                         }
@@ -161,6 +216,7 @@ public enum HttpMethod {
             }
 
         }
+
 
         class FileXfer extends Xfer {
             long progress;
@@ -190,8 +246,22 @@ public enum HttpMethod {
                                     final double span = (double) completion - creation / 1000.0;
                                     final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName() + '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + fc.size() / span + ' ' + "chunkavg " + fc.size() / chunk;
                                     System.err.println(s);
+
+                                   try{
+                                       try {
+                                           new Thread((Runnable)((Object[]) key.attachment())[2],"xfer cleanup").start();
+                                       } catch (RuntimeException e) {
+                                                       ///nil
+                                       }
+
+
+                                   } finally {
+                                   }
                                     try {
                                         fc.close();
+
+
+
                                     } catch (IOException ignored) {
                                     }
                                     if (pipeline) {
