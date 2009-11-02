@@ -4,6 +4,7 @@ derby.log
 *.ipr
 *.iws
 *.class
+*.*~
 ./**/*.eml
 ./**/*.iml
 ./**/*.ipr
