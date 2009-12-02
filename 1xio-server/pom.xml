@@ -30,7 +30,7 @@
                     </descriptorId>
                     <archive>
                         <manifest>
-                            <mainClass>one.xio.server.Agent</mainClass>
+                            <mainClass>one.xio.server.DefaultAgent</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

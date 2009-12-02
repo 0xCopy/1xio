@@ -1,6 +1,5 @@
 package one.xio.server;
 
-
 import alg.Pair;
 import javolution.text.Text;
 import javolution.util.FastList;
@@ -19,29 +18,26 @@ import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 
 import static one.xio.proto.ProtoUtil.threadPool;
-//import javolution.text.Text;
 
 /**
- * Hello world!
+ * Created by IntelliJ IDEA.
+ * User: kiosk
+ * Date: Dec 2, 2009
+ * Time: 2:32:15 AM
+ * To change this template use File | Settings | File Templates.
  */
-public class Agent {
+public abstract class Agent {
     private boolean killswitch = false;
     private ServerSocketChannel serverSocketChannel;
-    //    public ByteBuffer token;
     private int port = 8080;
-
-    // '$' as universal polymorphic default predicate,
-    // when in doubt '$ $($...  $){} is the dominant generic predicate expression
-
     private static final HttpMethod $ = HttpMethod.$;
     private List<Pair<String, String>> cfg = new FastList<Pair<String, String>>();
-
-    private final Selector selector = Selector.open();
+    final Selector selector;
     private SelectionKey listenerKey;
     private int bufferSize = 512;
 
     public Agent(CharSequence... args) throws IOException {
-
+        selector = Selector.open();
         handleArgs(args);
         Runnable runnable = new Runnable() {
             public void run() {
@@ -50,6 +46,7 @@ public class Agent {
                     initSocket();
 
                     setListenerKey(getServerSocketChannel().register(getSelector(), SelectionKey.OP_ACCEPT));
+
 
                     while (!isKillswitch()) {
                         final int count = getSelector().select();
@@ -141,7 +138,7 @@ public class Agent {
         threadPool.submit(runnable);
     }
 
-    private void handleArgs(CharSequence[] args) {
+    public void handleArgs(CharSequence[] args) {
         for (CharSequence arg : args) {
             if (arg.charAt(0) == '-') {
                 final String[] v = Pattern.compile("=").split(arg, 2);
@@ -151,47 +148,38 @@ public class Agent {
         }
     }
 
-    private void onRunnable(Object attachment) {
+    public void onRunnable(Object attachment) {
         ((Runnable) attachment).run();
     }
 
-    private void onCallable(Object attachment) throws Exception {
+    public void onCallable(Object attachment) throws Exception {
         final Callable callable = (Callable) attachment;
         callable.call();
     }
 
-    private void onAccept(SelectionKey key) {
-        onAccept(key, get$());
-    }
+    public abstract void onAccept(SelectionKey key);
 
-    private void onConnect(SelectionKey key) {
-        onConnect(key, get$());
-    }
+    public abstract void onConnect(SelectionKey key);
 
-    private void onRead(SelectionKey key) {
-        onRead(key, get$());
-    }
+    public abstract void onRead(SelectionKey key);
 
-    private void onWrite(SelectionKey key) {
-        onWrite(key, get$());
-    }
+    public abstract void onWrite(SelectionKey key);
 
-    private void onAccept(SelectionKey key, HttpMethod m) {
+    public void onAccept(SelectionKey key, HttpMethod m) {
         m.onAccept(key);
     }
 
-    private void onConnect(SelectionKey key, HttpMethod m) {
+    public void onConnect(SelectionKey key, HttpMethod m) {
         m.onConnect(key);
     }
 
-    private void onRead(SelectionKey key, HttpMethod m) {
+    public void onRead(SelectionKey key, HttpMethod m) {
         m.onRead(key);
     }
 
-    private void onWrite(SelectionKey key, HttpMethod m) {
+    public void onWrite(SelectionKey key, HttpMethod m) {
         m.onWrite(key);
     }
-
 
     protected void initSocket() throws IOException {
         setServerSocketChannel(ServerSocketChannel.open());
@@ -203,16 +191,6 @@ public class Agent {
         socket.setReceiveBufferSize(getBufferSize());
     }
 
-    static public void main(String... a) throws IOException {
-        final Agent agent = new Agent(a);
-
-        while (!agent.isKillswitch()) {
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException ignored) {
-            }
-        }
-    }
 
     public boolean isKillswitch() {
         return killswitch;
@@ -237,7 +215,6 @@ public class Agent {
     public void setPort(int port) {
         this.port = port;
     }
-
 
     public List<Pair<String, String>> getCfg() {
         return cfg;
