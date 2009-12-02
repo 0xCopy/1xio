@@ -42,13 +42,7 @@ public class Agent {
 
     public Agent(CharSequence... args) throws IOException {
 
-        for (CharSequence arg : args) {
-            if (arg.charAt(0) == '-') {
-                final String[] v = Pattern.compile("=").split(arg, 2);
-                final Pair<String, String> pair = new Pair<String, String>(Text.intern(v[0].substring(1)).toString(), Text.valueOf(v[1]).toString());
-                getCfg().add(pair);
-            }
-        }
+        handleArgs(args);
         Runnable runnable = new Runnable() {
             public void run() {
 
@@ -68,9 +62,9 @@ public class Agent {
                             if (key.isValid()) {
                                 try {
 
-                                    final Object at = key.attachment();
+                                    final Object attachment = key.attachment();
 
-                                    if (at == null) {
+                                    if (attachment == null) {
                                         if (key.isValid() && key.isWritable()) {
                                             onWrite(key);
                                         }
@@ -86,43 +80,46 @@ public class Agent {
                                         if (key.isValid() && key.isAcceptable()) {
                                             onAccept(key);
                                         }
-
+                                        continue;
                                     }
-                                    if (at instanceof Callable) {
+
+                                    if (attachment instanceof Callable) {
 //                                        client.interestOps(0);
-//                                        threadPool.submit((Callable) at);
-                                        final Callable callable = (Callable) at;
-                                        callable.call();
+//                                        threadPool.submit((Callable) attachment);
+                                        onCallable(attachment);
                                         continue;
-                                    } else if (at instanceof Runnable) {
+                                    }
+
+                                    if (attachment instanceof Runnable) {
 //                                         client.interestOps(0);
-//                                        threadPool.submit((Runnable) at);
+//                                        threadPool.submit((Runnable) attachment);
 
-                                        ((Runnable) at).run();
+                                        onRunnable(attachment);
                                         continue;
-                                    } else {
+                                    }
 
-                                        final HttpMethod m;
-                                        m = (at == null) ?
-                                                $() : (HttpMethod) (at instanceof Object[] && ((Object[]) at)[0] instanceof HttpMethod ?
-                                                ((Object[]) at)[0] : at instanceof HttpMethod ?
-                                                at : $());
+                                    HttpMethod m;
+                                    if (attachment instanceof Object[] && ((Object[]) attachment)[0] instanceof HttpMethod)
+                                        m = (HttpMethod) ((Object[]) attachment)[0];
+                                    else if ((HttpMethod) attachment instanceof HttpMethod)
+                                        m = (HttpMethod) attachment;
+                                    else
+                                        m = get$();
 
-                                        if (key.isValid() && key.isWritable()) {
-                                            onWrite(key, m);
-                                        }
+                                    if (key.isValid() && key.isWritable()) {
+                                        onWrite(key, m);
+                                    }
 
-                                        if (key.isValid() && key.isReadable()) {
-                                            onRead(key, m);
-                                        }
+                                    if (key.isValid() && key.isReadable()) {
+                                        onRead(key, m);
+                                    }
 
-                                        if (key.isValid() && key.isConnectable()) {
-                                            onConnect(key, m);
-                                        }
+                                    if (key.isValid() && key.isConnectable()) {
+                                        onConnect(key, m);
+                                    }
 
-                                        if (key.isValid() && key.isAcceptable()) {
-                                            onAccept(key, m);
-                                        }
+                                    if (key.isValid() && key.isAcceptable()) {
+                                        onAccept(key, m);
                                     }
 
 
@@ -144,20 +141,39 @@ public class Agent {
         threadPool.submit(runnable);
     }
 
-    private void onAccept(SelectionKey key) {
+    private void handleArgs(CharSequence[] args) {
+        for (CharSequence arg : args) {
+            if (arg.charAt(0) == '-') {
+                final String[] v = Pattern.compile("=").split(arg, 2);
+                final Pair<String, String> pair = new Pair<String, String>(Text.intern(v[0].substring(1)).toString(), Text.valueOf(v[1]).toString());
+                getCfg().add(pair);
+            }
+        }
+    }
 
+    private void onRunnable(Object attachment) {
+        ((Runnable) attachment).run();
+    }
+
+    private void onCallable(Object attachment) throws Exception {
+        final Callable callable = (Callable) attachment;
+        callable.call();
+    }
+
+    private void onAccept(SelectionKey key) {
+        onAccept(key, get$());
     }
 
     private void onConnect(SelectionKey key) {
-
+        onConnect(key, get$());
     }
 
     private void onRead(SelectionKey key) {
-
+        onRead(key, get$());
     }
 
     private void onWrite(SelectionKey key) {
-
+        onWrite(key, get$());
     }
 
     private void onAccept(SelectionKey key, HttpMethod m) {
