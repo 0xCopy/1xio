@@ -3,23 +3,24 @@ package one.xio.proto;
 import alg.Pair;
 import javolution.text.Text;
 import javolution.util.FastMap;
-import static one.xio.proto.HttpStatus.*;
-import static one.xio.proto.ProtoUtil.UTF8;
-import static one.xio.proto.ProtoUtil.preIndex;
 
 import java.io.*;
-import static java.lang.Character.isWhitespace;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.*;
-import static java.nio.channels.SelectionKey.OP_READ;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.logging.Logger;
+
+import static java.lang.Character.isWhitespace;
+import static java.nio.channels.SelectionKey.OP_READ;
+import static one.xio.proto.HttpStatus.*;
+import static one.xio.proto.ProtoUtil.UTF8;
+import static one.xio.proto.ProtoUtil.preIndex;
 
 //import sun.nio.ch.SocketChannelImpl;
 
@@ -35,7 +36,7 @@ public enum HttpMethod {
             Object[] a = (Object[]) key.attachment();
             Xfer xfer = (Xfer) a[1];
 
-                xfer.sendChunk(key);
+            xfer.sendChunk(key);
 
         }
 
@@ -47,7 +48,7 @@ public enum HttpMethod {
          */
         @Override
         public void onAccept(final SelectionKey key) {
-            try {                  
+            try {
                 assert key.attachment() instanceof ByteBuffer;
                 final ByteBuffer src = (ByteBuffer) key.attachment();
 
@@ -95,7 +96,7 @@ public enum HttpMethod {
                         Xfer xfer = null;
                         FileChannel fc = null;
                         long contentLength = 0;
-                        File tempFile=null;
+                        File tempFile = null;
                         if (
                                 file.exists() &&
                                         file.isFile()) {
@@ -187,10 +188,10 @@ public enum HttpMethod {
 
 
                             final File tempFile1 = tempFile;
-                            key.attach(new Object[]{this, xfer, tempFile==null?null:new Runnable(){
+                            key.attach(new Object[]{this, xfer, tempFile == null ? null : new Runnable() {
                                 @Override
                                 public void run() {
-                                    ((File)tempFile1).delete();
+                                    ((File) tempFile1).delete();
                                 }
                             }});
 
@@ -247,19 +248,18 @@ public enum HttpMethod {
                                     final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName() + '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + fc.size() / span + ' ' + "chunkavg " + fc.size() / chunk;
                                     System.err.println(s);
 
-                                   try{
-                                       try {
-                                           new Thread((Runnable)((Object[]) key.attachment())[2],"xfer cleanup").start();
-                                       } catch (RuntimeException e) {
-                                                       ///nil
-                                       }
+                                    try {
+                                        try {
+                                            new Thread((Runnable) ((Object[]) key.attachment())[2], "xfer cleanup").start();
+                                        } catch (RuntimeException e) {
+                                            ///nil
+                                        }
 
 
-                                   } finally {
-                                   }
+                                    } finally {
+                                    }
                                     try {
                                         fc.close();
-
 
 
                                     } catch (IOException ignored) {
@@ -327,7 +327,7 @@ public enum HttpMethod {
         abstract class Xfer {
 
 
-            abstract public void sendChunk(SelectionKey key)  ;
+            abstract public void sendChunk(SelectionKey key);
         }},
 
     POST, PUT, HEAD, DELETE, TRACE, CONNECT {
@@ -464,20 +464,18 @@ public enum HttpMethod {
 
     public boolean recognize(ByteBuffer request) {
 
+        ByteBuffer t = (ByteBuffer) token.duplicate().position(0);
+        ByteBuffer bsrc = (ByteBuffer) request.duplicate().position(0).limit(t.limit() + 1);
+        boolean match = true;
         try {
-            final byte b = request.get(margin);
-            if (isWhitespace(b)) {
-                final int i1 = margin - 1;
-                for (int i = 0; i < i1; i++) {
-                    final byte b1 = request.get(i);
-                    final byte b2 = token.get(i);
-                    if (b1 != b2)
-                        return false;
-                }
-            }
-        } catch (Throwable e) {
+            while (t.hasRemaining() && bsrc.hasRemaining() && (match = (t.get() == bsrc.get()))) ;
+        } catch (Exception e) {
+            /*e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.*/
+        } finally {
         }
-        return true;
+
+        return (match && !t.hasRemaining() && isWhitespace(bsrc.get()));
+
     }
 
 

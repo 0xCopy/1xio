@@ -41,7 +41,6 @@ public abstract class Agent {
         handleArgs(args);
         Runnable runnable = new Runnable() {
             public void run() {
-
                 try {
                     initSocket();
 
@@ -146,7 +145,7 @@ public abstract class Agent {
                 getCfg().add(pair);
             }
         }
-    }
+            }
 
     public void onRunnable(Object attachment) {
         ((Runnable) attachment).run();
