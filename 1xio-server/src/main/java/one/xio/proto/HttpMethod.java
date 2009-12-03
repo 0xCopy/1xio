@@ -47,7 +47,7 @@ public enum HttpMethod {
          */
         @Override
         public void onAccept(final SelectionKey key) {
-            try {
+            try {                  
                 assert key.attachment() instanceof ByteBuffer;
                 final ByteBuffer src = (ByteBuffer) key.attachment();
 
@@ -58,7 +58,7 @@ public enum HttpMethod {
                 src.limit(lines.getLast().$1());
 
                 if (path.startsWith(HTTP_PREFIX)) {
-                    Logger.getAnonymousLogger().info(HTTP_PREFIX + "is prefix of the request " + path);
+                    Logger.getAnonymousLogger().info(HTTP_PREFIX + " is prefix of the request " + path);
                     URL uri = new URL(path.toString());
 
                     int port = uri.getPort();
@@ -462,13 +462,19 @@ public enum HttpMethod {
      * @return
      */
 
-    boolean recognize(ByteBuffer request) {
+    public boolean recognize(ByteBuffer request) {
 
         try {
-            if (isWhitespace(request.get(margin)))
-                for (int i = 0; i < margin - 1; i++)
-                    if (request.get(i) != token.get(i))
+            final byte b = request.get(margin);
+            if (isWhitespace(b)) {
+                final int i1 = margin - 1;
+                for (int i = 0; i < i1; i++) {
+                    final byte b1 = request.get(i);
+                    final byte b2 = token.get(i);
+                    if (b1 != b2)
                         return false;
+                }
+            }
         } catch (Throwable e) {
         }
         return true;
