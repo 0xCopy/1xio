@@ -409,7 +409,7 @@ public enum HttpMethod {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    byteBufferReference = (ByteBuffer.allocateDirect(1024));
+                    byteBufferReference = (ByteBuffer.allocateDirect(bufferSize));
                     try {
                         final int i = channel.read(byteBufferReference);
 
@@ -444,6 +444,7 @@ public enum HttpMethod {
         }
 
     },;
+     private static int bufferSize = 1024;
 //    private static int DEFAULT_EXP= DEFAULT_EXP;
 
     private static final String HTTP_PREFIX = "http://".intern();
@@ -593,7 +594,7 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1024));
+        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(bufferSize));
         try {
             final ByteBuffer buffer = byteBufferReference;
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append("\r\n").flip();
@@ -620,4 +621,11 @@ public enum HttpMethod {
     }
 
 
+    public static int getBufferSize() {
+        return bufferSize;
+    }
+
+    public static void setBufferSize(int bufferSize) {
+        HttpMethod.bufferSize = bufferSize;
+    }
 }
