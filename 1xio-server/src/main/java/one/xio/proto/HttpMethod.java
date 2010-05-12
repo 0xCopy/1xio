@@ -3,23 +3,24 @@ package one.xio.proto;
 import alg.Pair;
 import javolution.text.Text;
 import javolution.util.FastMap;
-import static one.xio.proto.HttpStatus.*;
-import static one.xio.proto.ProtoUtil.UTF8;
-import static one.xio.proto.ProtoUtil.preIndex;
 
 import java.io.*;
-import static java.lang.Character.isWhitespace;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.*;
-import static java.nio.channels.SelectionKey.OP_READ;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.logging.Logger;
+
+import static java.lang.Character.isWhitespace;
+import static java.nio.channels.SelectionKey.OP_READ;
+import static one.xio.proto.HttpStatus.*;
+import static one.xio.proto.ProtoUtil.UTF8;
+import static one.xio.proto.ProtoUtil.preIndex;
 
 //import sun.nio.ch.SocketChannelImpl;
 
@@ -35,7 +36,7 @@ public enum HttpMethod {
             Object[] a = (Object[]) key.attachment();
             Xfer xfer = (Xfer) a[1];
 
-                xfer.sendChunk(key);
+            xfer.sendChunk(key);
 
         }
 
@@ -58,7 +59,7 @@ public enum HttpMethod {
                 src.limit(lines.getLast().$1());
 
                 if (path.startsWith(HTTP_PREFIX)) {
-                    Logger.getAnonymousLogger().info(HTTP_PREFIX + "is prefix of the request " + path);
+                    Logger.getAnonymousLogger().info(HTTP_PREFIX + " is prefix of the request " + path);
                     URL uri = new URL(path.toString());
 
                     int port = uri.getPort();
@@ -95,7 +96,7 @@ public enum HttpMethod {
                         Xfer xfer = null;
                         FileChannel fc = null;
                         long contentLength = 0;
-                        File tempFile=null;
+                        File tempFile = null;
                         if (
                                 file.exists() &&
                                         file.isFile()) {
@@ -187,10 +188,10 @@ public enum HttpMethod {
 
 
                             final File tempFile1 = tempFile;
-                            key.attach(new Object[]{this, xfer, tempFile==null?null:new Runnable(){
+                            key.attach(new Object[]{this, xfer, tempFile == null ? null : new Runnable() {
                                 @Override
                                 public void run() {
-                                    ((File)tempFile1).delete();
+                                    ((File) tempFile1).delete();
                                 }
                             }});
 
@@ -247,19 +248,18 @@ public enum HttpMethod {
                                     final String s = name() + ':' + ((SocketChannel) key.channel()).socket().getInetAddress().getCanonicalHostName() + '/' + name.toString() + ' ' + creation + ' ' + ":complete:" + ' ' + fc.size() / span + ' ' + "chunkavg " + fc.size() / chunk;
                                     System.err.println(s);
 
-                                   try{
-                                       try {
-                                           new Thread((Runnable)((Object[]) key.attachment())[2],"xfer cleanup").start();
-                                       } catch (RuntimeException e) {
-                                                       ///nil
-                                       }
+                                    try {
+                                        try {
+                                            new Thread((Runnable) ((Object[]) key.attachment())[2], "xfer cleanup").start();
+                                        } catch (RuntimeException e) {
+                                            ///nil
+                                        }
 
 
-                                   } finally {
-                                   }
+                                    } finally {
+                                    }
                                     try {
                                         fc.close();
-
 
 
                                     } catch (IOException ignored) {
@@ -327,7 +327,7 @@ public enum HttpMethod {
         abstract class Xfer {
 
 
-            abstract public void sendChunk(SelectionKey key)  ;
+            abstract public void sendChunk(SelectionKey key);
         }},
 
     POST, PUT, HEAD, DELETE, TRACE, CONNECT {
@@ -409,7 +409,7 @@ public enum HttpMethod {
                     final SocketChannel channel;
                     channel = (SocketChannel) key.channel();
 
-                    byteBufferReference = (ByteBuffer.allocateDirect(1024));
+                    byteBufferReference = (ByteBuffer.allocateDirect(bufferSize));
                     try {
                         final int i = channel.read(byteBufferReference);
 
@@ -444,6 +444,7 @@ public enum HttpMethod {
         }
 
     },;
+     private static int bufferSize = 1024;
 //    private static int DEFAULT_EXP= DEFAULT_EXP;
 
     private static final String HTTP_PREFIX = "http://".intern();
@@ -462,16 +463,20 @@ public enum HttpMethod {
      * @return
      */
 
-    boolean recognize(ByteBuffer request) {
+    public boolean recognize(ByteBuffer request) {
 
+        ByteBuffer t = (ByteBuffer) token.duplicate().position(0);
+        ByteBuffer bsrc = (ByteBuffer) request.duplicate().position(0).limit(t.limit() + 1);
+        boolean match = true;
         try {
-            if (isWhitespace(request.get(margin)))
-                for (int i = 0; i < margin - 1; i++)
-                    if (request.get(i) != token.get(i))
-                        return false;
-        } catch (Throwable e) {
+            while (t.hasRemaining() && bsrc.hasRemaining() && (match = (t.get() == bsrc.get()))) ;
+        } catch (Exception e) {
+            /*e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.*/
+        } finally {
         }
-        return true;
+
+        return (match && !t.hasRemaining() && isWhitespace(bsrc.get()));
+
     }
 
 
@@ -589,7 +594,7 @@ public enum HttpMethod {
     private static void response(SelectionKey key, HttpStatus httpStatus) throws IOException {
 
 
-        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(1024));
+        final ByteBuffer byteBufferReference = (ByteBuffer.allocateDirect(bufferSize));
         try {
             final ByteBuffer buffer = byteBufferReference;
             final CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append("\r\n").flip();
@@ -616,4 +621,11 @@ public enum HttpMethod {
     }
 
 
+    public static int getBufferSize() {
+        return bufferSize;
+    }
+
+    public static void setBufferSize(int bufferSize) {
+        HttpMethod.bufferSize = bufferSize;
+    }
 }
