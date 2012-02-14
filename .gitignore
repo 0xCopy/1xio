@@ -1,7 +1,6 @@
-1xio.iml
-1xio.ipr
-1xio.iws
+*.iml
+*.iws
 *.dmg
 target/*
-1xio.iml
-1xio.ipr
+*.iml
+*.ipr
