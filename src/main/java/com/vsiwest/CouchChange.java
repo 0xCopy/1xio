@@ -1,6 +1,7 @@
 package com.vsiwest;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.TreeMap;
 
 /**
@@ -14,5 +15,6 @@ public class CouchChange {
     public long seq;
     public String id;
     public ArrayList <TreeMap<String,String>>changes;
+    public Map doc;
     public boolean deleted;
 }

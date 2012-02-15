@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,7 +59,7 @@ public class CouchChangesClient {
     }
 
     private static String getFeedString() {
-        return "/" + feedname + "/_changes?feed=continuous&heartbeat=" +
+        return "/" + feedname + "/_changes?include_docs=true&feed=continuous&heartbeat=" +
                 POLL_HEARTBEAT_MS;
     }
 
@@ -205,8 +206,8 @@ public class CouchChangesClient {
                             String trim = UTF8.decode(handoff).toString().trim();
                             System.err.println("===" + trim);
 
-                            CouchChange couchChange = new Gson().fromJson(trim, CouchChange.class);
-                            System.err.println("+++"+couchChange.id);
+                            LinkedHashMap couchChange = new Gson().fromJson(trim, LinkedHashMap.class);
+                            System.err.println("+++"+couchChange.get("id"));
                             buffer.position(handoff.limit() + ENDL.length);
                             buffer = buffer.slice();
                         } while (buffer.hasRemaining());
