@@ -11,11 +11,13 @@ import java.nio.CharBuffer;
 import java.nio.channels.*;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
-import java.util.*;
+import java.util.Iterator;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.lang.Character.isWhitespace;
-import static java.nio.channels.SelectionKey.*;
+import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static one.xio.HttpStatus.*;
 
@@ -55,7 +57,8 @@ public enum HttpMethod {
                 String fname = strings[0];
 
 
-                RandomAccessFile fnode = new RandomAccessFile("./" + fname.replaceAll("../", "./"), "r");
+
+                RandomAccessFile fnode = new RandomAccessFile("./" + fname.replace("../", "./"), "r");
 
 
                 if (fnode.getFD().valid()) {
@@ -78,11 +81,11 @@ public enum HttpMethod {
                         channel.write(UTF8.encode(c));
                         key.interestOps(OP_WRITE);
                         key.attach(toArray(this, xfer));
-                    } catch (Exception ignored) {
+                    } catch (Exception ignored) {    ignored.printStackTrace();
                     }
                     return;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception ignored) { ignored.printStackTrace();
             }
             try {
                 response(key, $404);
@@ -115,7 +118,7 @@ public enum HttpMethod {
                                 fc.close();
                             } catch (IOException ignored) {
                             }
-                            key.attach($);
+                            key.attach(null);
                             key.interestOps(OP_READ);//pipeline requests
                         }
 
@@ -545,16 +548,16 @@ public enum HttpMethod {
                                 }
                             }
 
-                            if (key.isWritable()) {
+                            if (key.isValid()&&key.isWritable()) {
                                 m.onWrite(key);
                             }
-                            if (key.isReadable()) {
+                            if (key.isValid()&&key.isReadable()) {
                                 m.onRead(key);
                             }
-                            if (key.isAcceptable()) {
+                            if (key.isValid()&&key.isAcceptable()) {
                                 m.onAccept(key);
                             }
-                            if (key.isConnectable()) {
+                            if (key.isValid()&&key.isConnectable()) {
                                 m.onConnect(key);
                             }
                         } catch (Exception e) {

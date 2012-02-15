@@ -27,12 +27,12 @@ import static one.xio.HttpMethod.*;
  */
 public class CouchChangesClient {
 
-    private static String feedname = "clproxy";
+    private static String feedname = "fetchdocs";
     private static Serializable port = 5984;
     private static String hostname = "127.0.0.1";
     static boolean active = false;
     public static final int POLL_HEARTBEAT_MS = 45000;
-    public static final byte[] ENDUPDATE = new byte[]{/*'\n',*/ '\r', '\n'};
+    public static final byte[] ENDL = new byte[]{/*'\n',*/ '\r', '\n'};
 
     public static void main(String... args) throws IOException {
 
@@ -108,9 +108,9 @@ public class CouchChangesClient {
 
                 Object prev = attachment.length > 2 ? attachment[2] : null;
                 boolean stuff = false;
-                ByteBuffer wrap = ByteBuffer.wrap(ENDUPDATE);
+                ByteBuffer wrap = ByteBuffer.wrap(ENDL);
                 b.mark();
-                b.position(b.limit() - ENDUPDATE.length);
+                b.position(b.limit() - ENDL.length);
 
 
                 if (0 != wrap.compareTo(b)) {
@@ -196,7 +196,7 @@ public class CouchChangesClient {
                         System.err.println("<<<<" + buffer.limit());
                         do {
                             ByteBuffer b = buffer.slice();
-                            while (b.hasRemaining() && b.get() != ENDUPDATE[ENDUPDATE.length - 1]) ;
+                            while (b.hasRemaining() && b.get() != ENDL[ENDL.length - 1]) ;
                             b.flip();
                             Integer integer = Integer.valueOf(UTF8.decode(b).toString().trim(), 0x10);
                             System.err.println("<<<" + integer);
@@ -207,7 +207,7 @@ public class CouchChangesClient {
 
                             CouchChange couchChange = new Gson().fromJson(trim, CouchChange.class);
                             System.err.println("+++"+couchChange.id);
-                            buffer.position(handoff.limit() + ENDUPDATE.length);
+                            buffer.position(handoff.limit() + ENDL.length);
                             buffer = buffer.slice();
                         } while (buffer.hasRemaining());
                     }
