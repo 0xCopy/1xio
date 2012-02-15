@@ -125,7 +125,11 @@ public class CouchChangesClient {
                     key.attach(ob);
                 } else {
                     key.attach(new Object[]{attachment[0], attachment[1]});
-                    ClControlOnBufferCompletion(objects);
+
+
+                    //offload the heavy stuff to some other core if possible
+                    EXECUTOR_SERVICE.submit(
+                            new UpdateStreamRecvTask(objects));
                 }
                 return;
             }
@@ -151,68 +155,79 @@ public class CouchChangesClient {
 
     public static final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
 
-    static {
-    }
 
-    static void ClControlOnBufferCompletion(final Object[] blist) {
+    private static class UpdateStreamRecvTask implements Runnable {
+        Object[] slist;
+        ByteBuffer buffer;
+        Deque<ByteBuffer> linkedList;       //doesn't get used if only for a single read buffer
+        int bufsize;
+        private final Object[] blist;
 
+        public UpdateStreamRecvTask(Object[] blist) {
+            this.blist = blist;
+            slist = blist;
+            bufsize = 0;
+        }
 
-        //offload the heavy stuff to some other core if possible
-        EXECUTOR_SERVICE.submit(
-                new Runnable() {
-                    Object[] slist = blist;
-                    ByteBuffer buffer;
-                    Deque<ByteBuffer> linkedList;       //doesn't get used if only for a single read buffer
-                    int bufsize = 0;
+        public void run() {
 
-                    public void run() {
+            //grab the total size of the buffers and reorder them into a forward list.
 
-                        //grab the total size of the buffers and reorder them into a forward list.
+            do {
 
-                        do {
-
-                            ByteBuffer byteBuffer = (ByteBuffer) slist[0];
-                            slist = (Object[]) slist[1];
-                            if (0 == bufsize) {
-                                if (null == slist) {
-                                    buffer = byteBuffer;
-                                    break;//optimization
-                                }
-                                linkedList = new LinkedList<ByteBuffer>();
-                            }
-                            bufsize += byteBuffer.limit();
-                            linkedList.addFirst(byteBuffer);
-
-                        } while (null != slist);
-
-                        if (null == buffer) {
-                            buffer = ByteBuffer.allocateDirect(bufsize);
-
-                            for (ByteBuffer netBuffer : linkedList) {
-                                buffer.put(netBuffer);
-                            }
-                        }
-
-                        buffer.rewind();
-                        System.err.println("<<<<" + buffer.limit());
-                        do {
-                            ByteBuffer b = buffer.slice();
-                            while (b.hasRemaining() && b.get() != ENDL[ENDL.length - 1]) ;
-                            b.flip();
-                            Integer integer = Integer.valueOf(UTF8.decode(b).toString().trim(), 0x10);
-                            System.err.println("<<<" + integer);
-                            buffer = ((ByteBuffer) buffer.position(b.limit())).slice();
-                            ByteBuffer handoff = (ByteBuffer) buffer.slice().limit(integer);
-                            String trim = UTF8.decode(handoff).toString().trim();
-                            System.err.println("===" + trim);
-
-                            LinkedHashMap couchChange = new Gson().fromJson(trim, LinkedHashMap.class);
-                            System.err.println("+++"+couchChange.get("id"));
-                            buffer.position(handoff.limit() + ENDL.length);
-                            buffer = buffer.slice();
-                        } while (buffer.hasRemaining());
+                ByteBuffer byteBuffer = (ByteBuffer) slist[0];
+                slist = (Object[]) slist[1];
+                if (0 == bufsize) {
+                    if (null == slist) {
+                        buffer = byteBuffer;
+                        break;//optimization
                     }
-                });
+                    linkedList = new LinkedList<ByteBuffer>();
+                }
+                bufsize += byteBuffer.limit();
+                linkedList.addFirst(byteBuffer);
+
+            } while (null != slist);
+
+            if (null == buffer) {
+                buffer = ByteBuffer.allocateDirect(bufsize);
+
+                for (ByteBuffer netBuffer : linkedList) {
+                    buffer.put(netBuffer);
+                }
+            }
+
+            buffer.rewind();
+            System.err.println("<<<<" + buffer.limit());
+            do {
+                ByteBuffer b = buffer.slice();
+                while (b.hasRemaining() && b.get() != ENDL[ENDL.length - 1]) ;
+                b.flip();
+                Integer integer = Integer.valueOf(UTF8.decode(b).toString().trim(), 0x10);
+                System.err.println("<<<" + integer);
+                buffer = ((ByteBuffer) buffer.position(b.limit())).slice();
+                ByteBuffer handoff = (ByteBuffer) buffer.slice().limit(integer);
+                final String trim = UTF8.decode(handoff).toString().trim();
+                System.err.println("===" + trim);
+                final LinkedHashMap couchChange = new Gson().fromJson(trim, LinkedHashMap.class);
+
+                EXECUTOR_SERVICE.submit(new HandleDocUpdateTask(couchChange));
+                buffer.position(handoff.limit() + ENDL.length);
+                buffer = buffer.slice();
+            } while (buffer.hasRemaining());
+        }
+
+        private static class HandleDocUpdateTask implements Runnable {
+            private final LinkedHashMap couchChange;
+
+            public HandleDocUpdateTask(LinkedHashMap couchChange) {
+                this.couchChange = couchChange;
+            }
+
+            public void run() {
+                System.err.println("+++" + couchChange.get("id"));
+            }
+        }
     }
 }
 
