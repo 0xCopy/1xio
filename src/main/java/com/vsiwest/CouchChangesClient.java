@@ -37,9 +37,9 @@ public class CouchChangesClient {
   public final int POLL_HEARTBEAT_MS = 45000;
   public final byte[] ENDL = new byte[]{/*'\n',*/ '\r', '\n'};
   public boolean scriptExit2 = false;
-  static CouchChangesClient $default;
 
   static public void main(String... args) throws IOException {
+    CouchChangesClient $default;
     $default = new CouchChangesClient();
 
     int i = 0;
@@ -78,7 +78,7 @@ public class CouchChangesClient {
       channel.write((ByteBuffer) pongContents);
       key.interestOps(OP_READ);
     } catch (IOException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+      e.printStackTrace();  //todo: verify for a purpose
     }
   }
 
@@ -159,25 +159,13 @@ public class CouchChangesClient {
 
 
     } catch (SocketException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+      e.printStackTrace();  //todo: verify for a purpose
     } catch (IOException e) {
-      e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+      e.printStackTrace();  //todo: verify for a purpose
     }
   }
 
   public final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
-
-  public static void $CouchControllerConnect(SelectionKey key) {
-    $default.CouchControllerConnect(key);
-  }
-
-  public static void $CouchControllerWrite(SelectionKey key) {
-    $default.CouchControllerWrite(key);
-  }
-
-  public static void $CouchControllerRead(SelectionKey key) {
-    $default.CouchControllerRead(key);
-  }
 
 
   public class UpdateStreamRecvTask implements Runnable {
