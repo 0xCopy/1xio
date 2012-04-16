@@ -228,23 +228,24 @@ public class CouchChangesClient implements AsioVisitor {
         System.err.println("===" + trim);
         final LinkedHashMap couchChange = new Gson().fromJson(trim, LinkedHashMap.class);
 
-        EXECUTOR_SERVICE.submit(new HandleDocUpdateTask(couchChange));
+        EXECUTOR_SERVICE.submit(getDocUpdateHandler(couchChange));
         buffer.position(handoff.limit() + ENDL.length);
         buffer = buffer.slice();
       } while (buffer.hasRemaining());
     }
 
-    public class HandleDocUpdateTask implements Runnable {
-      public final LinkedHashMap couchChange;
 
-      public HandleDocUpdateTask(LinkedHashMap couchChange) {
-        this.couchChange = couchChange;
-      }
 
-      public void run() {
-        System.err.println("+++" + couchChange.get("id"));
-      }
-    }
   }
+  public Runnable getDocUpdateHandler(final LinkedHashMap couchChange)
+  {
+
+      return new Runnable() {
+
+        public void run() {
+          System.err.println("+++" + couchChange.get("id"));
+        }
+      };
+    }
 }
 
