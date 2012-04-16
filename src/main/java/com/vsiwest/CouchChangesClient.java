@@ -69,7 +69,7 @@ public class CouchChangesClient {
         POLL_HEARTBEAT_MS;
   }
 
-  public void CouchControllerWrite(SelectionKey key) {
+  public void onWrite(SelectionKey key) {
     Object[] attachment = (Object[]) key.attachment();
     SocketChannel channel = (SocketChannel) key.channel();
 
@@ -82,7 +82,7 @@ public class CouchChangesClient {
     }
   }
 
-  public void CouchControllerConnect(SelectionKey key) {
+  public void onConnect(SelectionKey key) {
     Object[] attachment = (Object[]) key.attachment();
     SocketChannel channel = (SocketChannel) key.channel();
     try {
@@ -103,7 +103,7 @@ public class CouchChangesClient {
    *
    */
 
-  public void CouchControllerRead(SelectionKey key) {
+  public void onRead(SelectionKey key) {
     SocketChannel channel = (SocketChannel) key.channel();
     Object[] attachment = (Object[]) key.attachment();
 

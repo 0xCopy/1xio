@@ -544,13 +544,13 @@ public enum HttpMethod {
                             }
               } else {
                 if (key.isValid() && key.isWritable()) {
-                  changesClient.CouchControllerWrite(key);
+                  changesClient.onWrite(key);
                 }
                 if (key.isValid() && key.isReadable()) {
-                  changesClient.CouchControllerRead(key);
+                  changesClient.onRead(key);
                 }
                 if (key.isValid() && key.isConnectable()) {
-                  changesClient.CouchControllerConnect(key);
+                  changesClient.onConnect(key);
                 }
               }
                         } catch (Exception e) {
