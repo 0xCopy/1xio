@@ -169,35 +169,7 @@ public enum HttpMethod {
 
         }},
 
-    POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION, $COUCHCONTROL {
-        @Override
-        public void onConnect(SelectionKey key) {
-            CouchChangesClient.CouchControllerConnect(key);
-
-
-        }
-
-        /**
-         *
-         * @param key [method,ByteBuffer]
-         */
-        @Override
-        void onWrite(SelectionKey key) {
-            CouchChangesClient.CouchControllerWrite(key);
-        }
-
-        /**
-         *
-         * @param key attach={this,string,killswitch}
-         */
-        @Override
-        public void onRead(SelectionKey key) {
-            CouchChangesClient.CouchControllerRead(key);
-        }
-
-    }, $COUCHACCESS {
-
-    },
+    POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION,
     $ {
         public void onAccept(SelectionKey selectionKey) {
             if (selectionKey.isAcceptable()) {
@@ -541,15 +513,23 @@ public enum HttpMethod {
                         try {
 
                             HttpMethod m;
+              CouchChangesClient changesClient = null;
                             m = $;
                             Object attachment = key.attachment();
                             if (attachment instanceof Object[]) {
                                 Object[] objects = (Object[]) attachment;
                                 if (objects[0] instanceof HttpMethod) {
                                     m = (HttpMethod) objects[0];
-                                }
-                            }
+                } else {
 
+                  if (objects[0] instanceof CouchChangesClient) {
+                    changesClient = (CouchChangesClient) objects[0];
+
+                                }
+
+                            }
+              }
+              if (null == changesClient) {
                             if (key.isValid()&&key.isWritable()) {
                                 m.onWrite(key);
                             }
@@ -562,6 +542,17 @@ public enum HttpMethod {
                             if (key.isValid()&&key.isConnectable()) {
                                 m.onConnect(key);
                             }
+              } else {
+                if (key.isValid() && key.isWritable()) {
+                  changesClient.CouchControllerWrite(key);
+                }
+                if (key.isValid() && key.isReadable()) {
+                  changesClient.CouchControllerRead(key);
+                }
+                if (key.isValid() && key.isConnectable()) {
+                  changesClient.CouchControllerConnect(key);
+                }
+              }
                         } catch (Exception e) {
                             e.printStackTrace();
                             key.attach(null);

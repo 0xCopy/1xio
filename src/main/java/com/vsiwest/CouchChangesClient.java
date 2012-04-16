@@ -18,7 +18,6 @@ import one.xio.HttpMethod;
 
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static one.xio.HttpMethod.$COUCHCONTROL;
 import static one.xio.HttpMethod.UTF8;
 import static one.xio.HttpMethod.killswitch;
 import static one.xio.HttpMethod.toArray;
@@ -31,55 +30,59 @@ import static one.xio.HttpMethod.toArray;
  */
 public class CouchChangesClient {
 
-  private static String feedname = "fetchdocs";
-  private static Serializable port = 5984;
-  private static String hostname = "127.0.0.1";
-  static boolean active = false;
-  public static final int POLL_HEARTBEAT_MS = 45000;
-  public static final byte[] ENDL = new byte[]{/*'\n',*/ '\r', '\n'};
-  private static boolean scriptExit2 = false;
+  public String feedname = "fetchdocs";
+  public Serializable port = 5984;
+  public String hostname = "127.0.0.1";
+  boolean active = false;
+  public final int POLL_HEARTBEAT_MS = 45000;
+  public final byte[] ENDL = new byte[]{/*'\n',*/ '\r', '\n'};
+  public boolean scriptExit2 = false;
+  static CouchChangesClient $default;
 
-  public static void main(String... args) throws IOException {
+  static public void main(String... args) throws IOException {
+    $default = new CouchChangesClient();
+
     int i = 0;
     if (i < args.length) {
-      feedname = args[i++];
+      $default.feedname = args[i++];
       if (i < args.length) {
-        hostname = args[i++];
+        $default.hostname = args[i++];
         if (i < args.length)
-          port = args[i++];
+          $default.port = args[i++];
       }
     }
 
 
-    InetSocketAddress remote = new InetSocketAddress(hostname, (Integer) port);
+    InetSocketAddress remote = new InetSocketAddress($default.hostname, (Integer) $default.port);
     SocketChannel channel = SocketChannel.open();
     channel.configureBlocking(false);
     channel.connect(remote);
 
-    String feedString = getFeedString();
+    String feedString = $default.getFeedString();
     System.err.println("feedstring: " + feedString);
-    HttpMethod.enqueue(channel, SelectionKey.OP_CONNECT, HttpMethod.$COUCHCONTROL, feedString);
+    HttpMethod.enqueue(channel, SelectionKey.OP_CONNECT, $default, feedString);
     HttpMethod.main(args);
   }
 
-  private static String getFeedString() {
+  public String getFeedString() {
     return "/" + feedname + "/_changes?include_docs=true&feed=continuous&heartbeat=" +
         POLL_HEARTBEAT_MS;
   }
 
-  public static void CouchControllerWrite(SelectionKey key) {
+  public void CouchControllerWrite(SelectionKey key) {
     Object[] attachment = (Object[]) key.attachment();
     SocketChannel channel = (SocketChannel) key.channel();
 
     try {
-      channel.write((ByteBuffer) attachment[1]);
+      Object pongContents = attachment[1];
+      channel.write((ByteBuffer) pongContents);
       key.interestOps(OP_READ);
     } catch (IOException e) {
       e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
     }
   }
 
-  public static void CouchControllerConnect(SelectionKey key) {
+  public void CouchControllerConnect(SelectionKey key) {
     Object[] attachment = (Object[]) key.attachment();
     SocketChannel channel = (SocketChannel) key.channel();
     try {
@@ -100,7 +103,7 @@ public class CouchChangesClient {
    *
    */
 
-  public static void CouchControllerRead(SelectionKey key) {
+  public void CouchControllerRead(SelectionKey key) {
     SocketChannel channel = (SocketChannel) key.channel();
     Object[] attachment = (Object[]) key.attachment();
 
@@ -148,7 +151,7 @@ public class CouchChangesClient {
         String str = "PUT /" + feedname + "/ HTTP/1.1\r\n\r\n";
         ByteBuffer encode = UTF8.encode(str);
         attachment[1] = encode;
-        key.attach(toArray($COUCHCONTROL, encode));
+        key.attach(toArray(this, encode));
         key.interestOps(OP_WRITE);
         System.err.println("attempting db creation (ignore 201 and restart)" + str);
         scriptExit2 = true;
@@ -162,10 +165,22 @@ public class CouchChangesClient {
     }
   }
 
-  public static final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
+  public final ExecutorService EXECUTOR_SERVICE = Executors.newCachedThreadPool();
+
+  public static void $CouchControllerConnect(SelectionKey key) {
+    $default.CouchControllerConnect(key);
+  }
+
+  public static void $CouchControllerWrite(SelectionKey key) {
+    $default.CouchControllerWrite(key);
+  }
+
+  public static void $CouchControllerRead(SelectionKey key) {
+    $default.CouchControllerRead(key);
+  }
 
 
-  private static class UpdateStreamRecvTask implements Runnable {
+  public class UpdateStreamRecvTask implements Runnable {
     Object[] slist;
     ByteBuffer buffer;
     Deque<ByteBuffer> linkedList;       //doesn't get used if only for a single read buffer
@@ -224,8 +239,8 @@ public class CouchChangesClient {
       } while (buffer.hasRemaining());
     }
 
-    private static class HandleDocUpdateTask implements Runnable {
-      private final LinkedHashMap couchChange;
+    public class HandleDocUpdateTask implements Runnable {
+      public final LinkedHashMap couchChange;
 
       public HandleDocUpdateTask(LinkedHashMap couchChange) {
         this.couchChange = couchChange;
