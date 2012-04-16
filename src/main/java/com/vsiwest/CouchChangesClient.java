@@ -37,15 +37,16 @@ public class CouchChangesClient {
   static boolean active = false;
   public static final int POLL_HEARTBEAT_MS = 45000;
   public static final byte[] ENDL = new byte[]{/*'\n',*/ '\r', '\n'};
+  private static boolean scriptExit2 = false;
 
   public static void main(String... args) throws IOException {
-
-    if (0 < args.length) {
-      hostname = args[0];
-      if (1 < args.length) {
-        port = args[1];
-        if (2 < args.length)
-          feedname = args[2];
+    int i = 0;
+    if (i < args.length) {
+      feedname = args[i++];
+      if (i < args.length) {
+        hostname = args[i++];
+        if (i < args.length)
+          port = args[i++];
       }
     }
 
@@ -142,11 +143,15 @@ public class CouchChangesClient {
       } else if (s.startsWith("HTTP/1.1 201")) {
         killswitch = true;
         System.err.println("bailing out on 201!");
+        if (scriptExit2) System.exit(2);
       } else {
-        ByteBuffer encode = UTF8.encode("PUT /" + feedname + "/ HTTP/1.1\r\n\r\n");
+        String str = "PUT /" + feedname + "/ HTTP/1.1\r\n\r\n";
+        ByteBuffer encode = UTF8.encode(str);
         attachment[1] = encode;
         key.attach(toArray($COUCHCONTROL, encode));
         key.interestOps(OP_WRITE);
+        System.err.println("attempting db creation (ignore 201 and restart)" + str);
+        scriptExit2 = true;
       }
 
 

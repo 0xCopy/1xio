@@ -1,14 +1,18 @@
 package one.xio;
 
-import com.vsiwest.CouchChangesClient;
-
 import java.io.IOError;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.ref.Reference;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.channels.*;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.util.Iterator;
@@ -16,10 +20,14 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import com.vsiwest.CouchChangesClient;
+
 import static java.lang.Character.isWhitespace;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static one.xio.HttpStatus.*;
+import static one.xio.HttpStatus.$200;
+import static one.xio.HttpStatus.$404;
+import static one.xio.HttpStatus.$501;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -126,8 +134,7 @@ public enum HttpMethod {
                         key.cancel();
                         try {
                             fc.close();
-                        } catch (IOException e1) {
-//                            e1.printStackTrace();
+                        } catch (IOException ignored) {
                         }
                         fc = null;
                         try {
@@ -137,8 +144,6 @@ public enum HttpMethod {
                         } catch (IOException ignored) {
                         }
                     }
-                } else {
-                    return;
                 }
             }
 
@@ -248,8 +253,6 @@ public enum HttpMethod {
          */
         @Override
         public void onRead(SelectionKey key) {
-
-
             Reference<ByteBuffer> byteBufferReference = null;
             try {
                 Object[] p = (Object[]) key.attachment();
@@ -358,7 +361,7 @@ public enum HttpMethod {
         ByteBuffer out = (ByteBuffer) in.duplicate().position(0);
 
 
-        boolean isBlank = true, wasBlank = true;
+        boolean isBlank = true, wasBlank;
         int prevIdx = 0;
         in.position(margin);
         char b = 0;
@@ -382,8 +385,6 @@ public enum HttpMethod {
 
 
     public CharSequence methodParameters(ByteBuffer indexEntries) throws IOException {
-
-
         /***
          * seemingly a lot of work to do as little as possible
          *
@@ -393,7 +394,7 @@ public enum HttpMethod {
         int last = 0;
         int b;
 
-        // start from 0 and traverese to null terminator inserted during the tokenization... 
+        // start from 0 and traverese to null terminator inserted during the tokenization...
         while ((b = indexEntries.get()) != 0 && (indexEntries.position() <= margin)) last = b & 0xff;
 
         int len = indexEntries.position();
@@ -406,7 +407,8 @@ public enum HttpMethod {
                 && !Character.isWhitespace(b)
                 && ('\n' != b)
                 && ('\r' != b)
-                && ('\t' != b)) ;
+                && ('\t' != b)
+            ) ;
 
         return decoder.decode((ByteBuffer) indexEntries.flip().position(margin));
 
