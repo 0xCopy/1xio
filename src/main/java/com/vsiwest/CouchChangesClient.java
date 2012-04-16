@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.google.gson.Gson;
+import one.xio.AsioVisitor;
 import one.xio.HttpMethod;
 
 import static java.nio.channels.SelectionKey.OP_READ;
@@ -28,7 +29,7 @@ import static one.xio.HttpMethod.toArray;
  * Date: 2/12/12
  * Time: 10:24 PM
  */
-public class CouchChangesClient {
+public class CouchChangesClient implements AsioVisitor {
 
   public String feedname = "fetchdocs";
   public Serializable port = 5984;
@@ -39,18 +40,19 @@ public class CouchChangesClient {
   public boolean scriptExit2 = false;
 
   static public void main(String... args) throws IOException {
-    CouchChangesClient $default;
-    $default = new CouchChangesClient();
+    CouchChangesClient $default = new CouchChangesClient();
 
     int i = 0;
     if (i < args.length) {
       $default.feedname = args[i++];
-      if (i < args.length) {
-        $default.hostname = args[i++];
-        if (i < args.length)
-          $default.port = args[i++];
-      }
+
     }
+    if (i < args.length) {
+      $default.hostname = args[i++];
+
+    }
+    if (i < args.length)
+      $default.port = args[i++];
 
 
     InetSocketAddress remote = new InetSocketAddress($default.hostname, (Integer) $default.port);
@@ -80,6 +82,11 @@ public class CouchChangesClient {
     } catch (IOException e) {
       e.printStackTrace();  //todo: verify for a purpose
     }
+  }
+
+  @Override
+  public void onAccept(SelectionKey key) {
+    throw new UnsupportedOperationException("OnAccept unused");
   }
 
   public void onConnect(SelectionKey key) {
