@@ -7,7 +7,7 @@
 
     <groupId>1xio</groupId>
     <artifactId>1xio</artifactId>
-    <version>1.0.1</version>
+    <version>1.9.0</version>
     <build>
         <plugins>
          <!--   <plugin>
