@@ -15,7 +15,6 @@ public enum HttpHeaders {
   Accept,
   User$2dAgent,;
 
-
   private final CharBuffer header = CharBuffer.wrap(URLDecoder.decode(name().replace('$', '%')));
 
   private final ByteBuffer token = HttpMethod.UTF8.encode(header);
@@ -87,6 +86,4 @@ public enum HttpHeaders {
 
     return ret;
   }
-
-
 }

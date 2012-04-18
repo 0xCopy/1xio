@@ -239,47 +239,6 @@ public enum HttpMethod implements AsioVisitor {
       } catch (IOException e) {
         e.printStackTrace();  //todo: verify for a purpose
       }
-
-//                Reference<ByteBuffer> byteBufferReference = null;
-//                try {
-//                  Object[] p = (Object[]) key.attachment();
-//
-//                  if (p == null) {
-//                    SocketChannel channel;
-//                    channel = (SocketChannel) key.channel();
-//
-//
-//                    try {
-//                      ByteBuffer buffer =
-//
-//                          ByteBuffer.allocateDirect(channel.socket().getSendBufferSize());
-//                      int i = channel.read(buffer);
-//
-//                      buffer.flip().mark();
-//
-//                      for (HttpMethod httpMethod : HttpMethod.values())
-//                        if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
-//                          //System.out.println("found: " + httpMethod);
-//                          key.attach(buffer);
-//                         httpMethod.onConnect(key);
-//                          return;
-//                        }
-//
-//                      response(key, HttpStatus.$400);
-//                      channel.write(buffer);
-//                    } catch (Exception ignored) {
-//                    }
-//                    channel.close();
-//                    return;
-//                  }
-//
-//                  HttpMethod fst = (HttpMethod) p[0];
-//                  fst.onRead(key);
-//
-//                } catch (IOException e) {
-//
-//                  e.printStackTrace();
-//                }
     }
 
     @Override
@@ -360,7 +319,7 @@ public enum HttpMethod implements AsioVisitor {
       if ((!isBlank) && wasBlank) {
         after.put((byte) ((byte) (before.position() & 0xff) - 1));
 
-        System.out.println("token found: " + before.duplicate().position(prevIdx));
+//        System.out.println("token found: " + before.duplicate().position(prevIdx));
       }
     }
     //    simple way to write at least one but more on occasion
@@ -502,10 +461,10 @@ public enum HttpMethod implements AsioVisitor {
     }
 
     //noinspection SynchronizationOnLocalVariableOrMethodParameter
-    init(a);
+    init(a, $);
   }
 
-  public static void init(String[] a) throws IOException {
+  public static void init(String[] a, AsioVisitor protocoldecoder) throws IOException {
 
     setSelector(Selector.open());
 
@@ -530,7 +489,7 @@ public enum HttpMethod implements AsioVisitor {
           if (key.isValid()) {
             try {
 
-              AsioVisitor m = $;
+              AsioVisitor m = protocoldecoder;
               Object attachment = key.attachment();
               if (attachment instanceof Object[]) {
                 Object[] objects = (Object[]) attachment;
