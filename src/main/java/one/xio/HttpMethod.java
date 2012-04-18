@@ -3,7 +3,6 @@ package one.xio;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.ref.Reference;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -52,19 +51,15 @@ public enum HttpMethod implements AsioVisitor {
      * @throws IOException
      */
     @Override
-    public void onAccept(SelectionKey key) {
+    public void onRead(SelectionKey key) {
       try {
         assert key.attachment() instanceof ByteBuffer;
         ByteBuffer buffer = (ByteBuffer) key.attachment();
         CharSequence parameters = methodParameters(buffer);
 
-
-        String[] strings = parameters.toString().split(" ");
-        String fname = strings[0];
-
+        String strings[] = parameters.toString().split(" "), fname = strings[0];
 
         RandomAccessFile fnode = new RandomAccessFile("./" + fname.replace("../", "./"), "r");
-
 
         if (fnode.getFD().valid()) {
           FileChannel fc = fnode.getChannel();
@@ -169,25 +164,19 @@ public enum HttpMethod implements AsioVisitor {
     }},
 
   POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION,
+  /**
+   * http method cracker for new connections and pipeline resumes.
+   */
   $ {
     public void onAccept(SelectionKey selectionKey) {
-      if (selectionKey.isAcceptable()) {
-        SocketChannel client = null;
-        SelectionKey clientkey = null;
-
-        try {
-          client = serverSocketChannel.accept();
-          client.configureBlocking(false).register(selector, OP_READ);
-        } catch (IOException e) {
-
-          e.printStackTrace();
-          try {
-            if (client != null) {
-              client.close();
-            }
-          } catch (IOException ignored) {
-          }
-        }
+      try {
+        // note this is a required serversocketchannel not to be confused with the rest of the boilerplate
+        ServerSocketChannel serverSocketChannel1 = (ServerSocketChannel) selectionKey.channel();
+        SocketChannel socketChannel = serverSocketChannel1.accept();
+        socketChannel.configureBlocking(false);
+        enqueue(socketChannel, SelectionKey.OP_READ, $);
+      } catch (IOException e) {
+        e.printStackTrace();  //todo: verify for a purpose
       }
     }
 
@@ -209,6 +198,7 @@ public enum HttpMethod implements AsioVisitor {
       key.cancel();
     }
 
+
     /**
      * this is where we implement http 1.1. request handling
      * <p/>
@@ -224,48 +214,77 @@ public enum HttpMethod implements AsioVisitor {
      */
     @Override
     public void onRead(SelectionKey key) {
-      Reference<ByteBuffer> byteBufferReference = null;
       try {
-        Object[] p = (Object[]) key.attachment();
+        SocketChannel channel = (SocketChannel) key.channel();
+        int receiveBufferSize = channel.socket().getReceiveBufferSize();
+        ByteBuffer dst = ByteBuffer.allocateDirect(receiveBufferSize);
+        int read = channel.read(dst);
+        if (-1 == read) {key.cancel();return;}
+        dst.flip();
+        try {
+          ByteBuffer duplicate = dst.duplicate();
+          while (duplicate.hasRemaining() && !Character.isWhitespace(duplicate.get())) ;
+          HttpMethod method = HttpMethod.valueOf(UTF8.decode((ByteBuffer) duplicate.flip()).toString().trim());
+          dst.limit(read).position(0);
+          key.attach(dst);
+          method.onRead(key);
 
-        if (p == null) {
-          SocketChannel channel;
-          channel = (SocketChannel) key.channel();
-
-
-          try {
-            ByteBuffer buffer =
-
-                ByteBuffer.allocateDirect(channel.socket().getSendBufferSize());
-            int i = channel.read(buffer);
-
-            buffer.flip().mark();
-
-            for (HttpMethod httpMethod : HttpMethod.values())
-              if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
-                //System.out.println("found: " + httpMethod);
-                key.attach(buffer);
-                httpMethod.onConnect(key);
-                return;
-              }
-
-            response(key, HttpStatus.$400);
-            channel.write(buffer);
-          } catch (Exception ignored) {
-          }
-          channel.close();
-          return;
+        } catch (Exception e) {
+          CharBuffer methodName = UTF8.decode((ByteBuffer) dst.clear().limit(read));
+          System.err.println("BOOM " + methodName);
+          e.printStackTrace();  //todo: verify for a purpose
         }
 
-        HttpMethod fst = (HttpMethod) p[0];
-        fst.onRead(key);
 
       } catch (IOException e) {
-
-        e.printStackTrace();
+        e.printStackTrace();  //todo: verify for a purpose
       }
+
+//                Reference<ByteBuffer> byteBufferReference = null;
+//                try {
+//                  Object[] p = (Object[]) key.attachment();
+//
+//                  if (p == null) {
+//                    SocketChannel channel;
+//                    channel = (SocketChannel) key.channel();
+//
+//
+//                    try {
+//                      ByteBuffer buffer =
+//
+//                          ByteBuffer.allocateDirect(channel.socket().getSendBufferSize());
+//                      int i = channel.read(buffer);
+//
+//                      buffer.flip().mark();
+//
+//                      for (HttpMethod httpMethod : HttpMethod.values())
+//                        if (httpMethod.recognize((ByteBuffer) buffer.reset())) {
+//                          //System.out.println("found: " + httpMethod);
+//                          key.attach(buffer);
+//                         httpMethod.onConnect(key);
+//                          return;
+//                        }
+//
+//                      response(key, HttpStatus.$400);
+//                      channel.write(buffer);
+//                    } catch (Exception ignored) {
+//                    }
+//                    channel.close();
+//                    return;
+//                  }
+//
+//                  HttpMethod fst = (HttpMethod) p[0];
+//                  fst.onRead(key);
+//
+//                } catch (IOException e) {
+//
+//                  e.printStackTrace();
+//                }
     }
 
+    @Override
+    public void onConnect(SelectionKey key) {
+    }
   },;
 
   private static CompletionException COMPLETION_EXCEPTION = new CompletionException();
@@ -296,7 +315,7 @@ public enum HttpMethod implements AsioVisitor {
    * @param s       the payload: grammar {enum,data1,data..n}
    * @throws ClosedChannelException
    */
-  public static void enqueue(SocketChannel channel, int op, Object... s) throws ClosedChannelException {
+  public static void enqueue(SelectableChannel channel, int op, Object... s) throws ClosedChannelException {
     q.add(toArray(channel, op, s));
   }
 
@@ -319,47 +338,41 @@ public enum HttpMethod implements AsioVisitor {
 
 
   /**
-   * returns a byte-array of token offsets in the first delim +1 bytes of the input buffer     *
-   * <p/>
-   * stateless and heapless
+   * tokenizes method parameters
    *
-   * @param in
-   * @return
+   * @param before
+   * @return byte-array buffer of method parameters
    */
+  public ByteBuffer tokenize(ByteBuffer before) {
 
-  public ByteBuffer tokenize(ByteBuffer in) {
-
-    ByteBuffer out = (ByteBuffer) in.duplicate().position(0);
+    ByteBuffer after = (ByteBuffer) before.duplicate().position(0);
 
 
     boolean isBlank = true, wasBlank;
     int prevIdx = 0;
-    in.position(margin);
+    before.position(margin);
     char b = 0;
-    while (b != '\n' && out.position() < margin) {
+    while (b != '\n' && after.position() < margin) {
       wasBlank = isBlank;
-      b = (char) (in.get() & 0xff);
+      b = (char) (before.get() & 0xff);
       isBlank = isWhitespace(b & 0xff);
 
       if ((!isBlank) && wasBlank) {
-        out.put((byte) ((byte) (in.position() & 0xff) - 1));
+        after.put((byte) ((byte) (before.position() & 0xff) - 1));
 
-        System.out.println("token found: " + in.duplicate().position(prevIdx));
+        System.out.println("token found: " + before.duplicate().position(prevIdx));
       }
     }
+    //    simple way to write at least one but more on occasion
+    while (after.put((byte) 0).position() < margin) ;
 
-    while (out.put((byte) 0).position() < margin) ;
 
-
-    return (ByteBuffer) out.position(0);
+    return (ByteBuffer) after.position(0);
   }
 
 
   public CharSequence methodParameters(ByteBuffer indexEntries) throws IOException {
-    /***
-     * seemingly a lot of work to do as little as possible
-     *
-     */
+
 
     indexEntries.position(0);
     int last = 0;
@@ -461,8 +474,6 @@ public enum HttpMethod implements AsioVisitor {
   public static boolean killswitch = false;
 
 
-  static ServerSocketChannel serverSocketChannel;
-
   private static int port = 8080;
 
   static public void setSelector(Selector selector) {
@@ -475,33 +486,38 @@ public enum HttpMethod implements AsioVisitor {
 
 
   public static void main(final String... a) throws IOException {
-    try {
-      Selector selector1 = null;
-      try {
-        selector1 = Selector.open();
-      } catch (IOException e1) {
-        e1.printStackTrace();
-      }
-      setSelector(selector1);
 
+
+    try {
+
+      final ServerSocketChannel serverSocketChannel;
       serverSocketChannel = ServerSocketChannel.open();
       serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
       serverSocketChannel.configureBlocking(false);
-      serverSocketChannel.register(selector1, SelectionKey.OP_ACCEPT);
 
+      enqueue(serverSocketChannel, SelectionKey.OP_ACCEPT, $);
 
     } catch (Throwable e11) {
       e11.printStackTrace();
     }
+
     //noinspection SynchronizationOnLocalVariableOrMethodParameter
+    init(a);
+  }
+
+  public static void init(String[] a) throws IOException {
+
+    setSelector(Selector.open());
+
     synchronized (a) {
       while (!killswitch) {
         while (!q.isEmpty()) {
           Object[] s = q.remove();
-          SocketChannel x = (SocketChannel) s[0];
+          SelectableChannel x = (SelectableChannel) s[0];
           Selector sel = getSelector();
           Integer op = (Integer) s[1];
           Object att = s[2];
+//          System.err.println("" + op + "/" + String.valueOf(att));
           x.register(sel, op, att);
         }
         selector.select(1000);
@@ -544,5 +560,4 @@ public enum HttpMethod implements AsioVisitor {
       }
     }
   }
-
 }
