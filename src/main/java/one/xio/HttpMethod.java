@@ -419,9 +419,7 @@ public enum HttpMethod implements AsioVisitor {
       ByteBuffer buffer = ByteBuffer.allocateDirect(channel.socket().getSendBufferSize());
       CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append("\r\n").flip();
       ByteBuffer out = UTF8.encode(charBuffer);
-
-
-      ((SocketChannel) key.channel()).write(out);
+     ((SocketChannel) key.channel()).write(out);
     } catch (Exception ignored) {
     }
 

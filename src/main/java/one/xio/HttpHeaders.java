@@ -1,7 +1,10 @@
 package one.xio;
 
 import java.net.URLDecoder;
-import java.nio.*;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * User: jim
@@ -27,25 +30,29 @@ public enum HttpHeaders {
    * @param headers OnRead seeks to EOL+EOL, sending the headers half to this method.
    * @return the value for the Content-Length header
    */
-  public static CharBuffer getContentLength(ByteBuffer headers) {
-    int b;
-    CharBuffer decode = null;
+  public static Map<String, int[]> getHeaders(ByteBuffer headers) {
+    headers.rewind();
+    int l = headers.limit();
+     Map<String, int[]> linkedHashMap = new LinkedHashMap<String, int[]>();
+    while (headers.hasRemaining() && '\n' != headers.get()) ;
     while (headers.hasRemaining()) {
-      int m = headers.position();
-      while (headers.hasRemaining() && '\n' != (b = headers.get())) ;
-      int l = headers.limit();
-      int e = headers.position();
-      ByteBuffer line = ((ByteBuffer) headers.position(m).limit(e)).slice();
-      headers.limit(l);
-      headers.position(e);
-      if (Content$2dLength.recognize(line)) {
-        ByteBuffer parse = Content$2dLength.parse(line);
-        decode = HttpMethod.UTF8.decode(parse);
-        break;
+      int p1 = headers.position();
+      while (headers.hasRemaining() && ':' != headers.get()) ;
+      int p2 = headers.position();
+      while (headers.hasRemaining() && '\n' != headers.get()) ;
+      int p3 = headers.position();
+
+      String key = HttpMethod.UTF8.decode((ByteBuffer) headers.position(p1).limit(p2 - 1)).toString().trim();
+      if (key.length() > 0) {
+        linkedHashMap.put(key, new int[]{p2, p3});
       }
+      headers.limit(l).position(p3);
+
     }
-    return decode;
+
+    return linkedHashMap;
   }
+
   public CharBuffer getHeader() {
     return header;
   }
@@ -61,9 +68,10 @@ public enum HttpHeaders {
   public void setTokenLen(int tokenLen) {
     this.tokenLen = tokenLen;
   }
+
   /**
    * @param slice
-   * @return   a slice suitable for UTF8.decode
+   * @return a slice suitable for UTF8.decode
    */
   public ByteBuffer parse(ByteBuffer slice) {
     slice.position(tokenLen + 2 + slice.position());
