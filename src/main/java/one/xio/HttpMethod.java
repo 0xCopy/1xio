@@ -219,7 +219,10 @@ public enum HttpMethod implements AsioVisitor {
         int receiveBufferSize = channel.socket().getReceiveBufferSize();
         ByteBuffer dst = ByteBuffer.allocateDirect(receiveBufferSize);
         int read = channel.read(dst);
-        if (-1 == read) {key.cancel();return;}
+        if (-1 == read) {
+          key.cancel();
+          return;
+        }
         dst.flip();
         try {
           ByteBuffer duplicate = dst.duplicate();
@@ -419,7 +422,7 @@ public enum HttpMethod implements AsioVisitor {
       ByteBuffer buffer = ByteBuffer.allocateDirect(channel.socket().getSendBufferSize());
       CharBuffer charBuffer = (CharBuffer) buffer.asCharBuffer().append("HTTP/1.1 ").append(httpStatus.name().substring(1)).append(' ').append(httpStatus.caption).append("\r\n").flip();
       ByteBuffer out = UTF8.encode(charBuffer);
-     ((SocketChannel) key.channel()).write(out);
+      ((SocketChannel) key.channel()).write(out);
     } catch (Exception ignored) {
     }
 
@@ -486,15 +489,8 @@ public enum HttpMethod implements AsioVisitor {
 
           if (key.isValid()) {
             try {
+              AsioVisitor m = inferAsioVisitor(protocoldecoder, key);
 
-              AsioVisitor m = protocoldecoder;
-              Object attachment = key.attachment();
-              if (attachment instanceof Object[]) {
-                Object[] objects = (Object[]) attachment;
-                if (objects[0] instanceof AsioVisitor) {
-                  m = (AsioVisitor) objects[0];
-                }
-              }
               if (key.isValid() && key.isWritable()) {
                 m.onWrite(key);
               }
@@ -516,5 +512,29 @@ public enum HttpMethod implements AsioVisitor {
         }
       }
     }
+  }
+
+  static AsioVisitor inferAsioVisitor(AsioVisitor default$, SelectionKey key) {
+    Object attachment = key.attachment();
+    if (attachment instanceof Object[]) {
+      for (Object o : ((Object[]) attachment)  ) {
+      attachment=o;break;
+      }
+    }
+    if (attachment instanceof Iterable) {
+      Iterable iterable = (Iterable) attachment;
+      for (Object o : iterable) {
+        attachment=o;break;
+      }
+    }
+    AsioVisitor m;
+    if (attachment instanceof AsioVisitor) {
+      m= (AsioVisitor) attachment;
+
+    }  else{
+
+      m = default$;
+    }
+    return m;
   }
 }
