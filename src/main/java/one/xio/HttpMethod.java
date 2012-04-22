@@ -57,7 +57,7 @@ public enum HttpMethod implements AsioVisitor {
         ByteBuffer buffer = (ByteBuffer) key.attachment();
         CharSequence parameters = methodParameters(buffer);
 
-        String strings[] = parameters.toString().split(" "), fname = strings[0];
+        String strings[] = parameters.toString().split("[ #?]"), fname = strings[0];
 
         RandomAccessFile fnode = new RandomAccessFile("./" + fname.replace("../", "./"), "r");
 
@@ -72,7 +72,8 @@ public enum HttpMethod implements AsioVisitor {
 //
             MimeType mimeType = null;
             try {
-              mimeType = MimeType.valueOf(fname.substring(fname.lastIndexOf('.') + 1));
+              String substring = fname.substring(fname.lastIndexOf('.') + 1);
+              mimeType = MimeType.valueOf(substring);
             } catch (Exception ignored) {
               throw new IOError(ignored);
             }
