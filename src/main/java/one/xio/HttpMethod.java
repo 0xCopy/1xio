@@ -504,7 +504,15 @@ public enum HttpMethod implements AsioVisitor {
               if (key.isValid() && key.isConnectable()) {
                 m.onConnect(key);
               }
-            } catch (Exception e) {
+            } catch (Throwable e) {
+              Object attachment = key.attachment();
+              if (attachment instanceof Object[]) {
+                Object[] objects = (Object[]) attachment;
+                System.err.println("BadHandler: " + java.util.Arrays.deepToString(objects));
+
+              } else
+                System.err.println("BadHandler: " + String.valueOf(attachment));
+
               e.printStackTrace();
               key.attach(null);
               key.channel().close();
@@ -518,21 +526,23 @@ public enum HttpMethod implements AsioVisitor {
   static AsioVisitor inferAsioVisitor(AsioVisitor default$, SelectionKey key) {
     Object attachment = key.attachment();
     if (attachment instanceof Object[]) {
-      for (Object o : ((Object[]) attachment)  ) {
-      attachment=o;break;
+      for (Object o : ((Object[]) attachment)) {
+        attachment = o;
+        break;
       }
     }
     if (attachment instanceof Iterable) {
       Iterable iterable = (Iterable) attachment;
       for (Object o : iterable) {
-        attachment=o;break;
+        attachment = o;
+        break;
       }
     }
     AsioVisitor m;
     if (attachment instanceof AsioVisitor) {
-      m= (AsioVisitor) attachment;
+      m = (AsioVisitor) attachment;
 
-    }  else{
+    } else {
 
       m = default$;
     }
