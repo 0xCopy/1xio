@@ -261,6 +261,7 @@ public enum HttpMethod implements AsioVisitor {
   public static Charset UTF8 = Charset.forName("UTF8");
   private static Selector selector;
   private static ConcurrentLinkedQueue<Object[]> q = new ConcurrentLinkedQueue<Object[]>();
+  public static Thread selectorThread;
 
   public static Selector getSelector() {
     return selector;
@@ -435,7 +436,7 @@ public enum HttpMethod implements AsioVisitor {
   public static boolean killswitch = false;
 
 
-  private static int port = 8080;
+  public static int port = 8080;
 
   static public void setSelector(Selector selector) {
     HttpMethod.selector = selector;
@@ -469,6 +470,7 @@ public enum HttpMethod implements AsioVisitor {
   public static void init(String[] a, AsioVisitor protocoldecoder) throws IOException {
 
     setSelector(Selector.open());
+    selectorThread = Thread.currentThread();
 
     synchronized (a) {
       while (!killswitch) {
