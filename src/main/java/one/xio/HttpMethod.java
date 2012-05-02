@@ -481,7 +481,11 @@ public enum HttpMethod implements AsioVisitor {
           Integer op = (Integer) s[1];
           Object att = s[2];
 //          System.err.println("" + op + "/" + String.valueOf(att));
-          x.register(sel, op, att);
+          try {
+            x.register(sel, op, att);
+          } catch ( Throwable e) {
+
+          }
         }
         selector.select(1000);
         Set<SelectionKey> keys = selector.selectedKeys();
