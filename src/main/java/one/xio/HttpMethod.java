@@ -490,26 +490,8 @@ public enum HttpMethod implements AsioVisitor {
 
           }
         }
-        final int select = selector.select();
-        if (0 == select) {
-          kick++;
-          System.err.println("selector kick up to " + kick + " of " + maxKick);
-          if (kick > maxKick) {
-            kick = 0;
-            final Set<SelectionKey> keys = selector.keys();
-            final Selector replacement = Selector.open();
-            for (SelectionKey key : keys) {
-              if (0 == key.interestOps() || !key.isValid()) {
-                key.channel().close();
-              } else {
-                key.channel().register(replacement, key.interestOps());
-              }
-            }
-            selector.close();
-            setSelector(replacement);
-          }
-          continue;
-        }
+        final int select = selector.select(1000);
+
         Set<SelectionKey> keys = selector.selectedKeys();
 
         for (Iterator<SelectionKey> i = keys.iterator(); i.hasNext(); ) {
