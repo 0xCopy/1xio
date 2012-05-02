@@ -483,7 +483,7 @@ public enum HttpMethod implements AsioVisitor {
 //          System.err.println("" + op + "/" + String.valueOf(att));
           try {
             x.register(sel, op, att);
-          } catch ( Throwable e) {
+          } catch (Throwable e) {
 
           }
         }
@@ -495,14 +495,23 @@ public enum HttpMethod implements AsioVisitor {
           i.remove();
 
           if (key.isValid()) {
+            final SocketChannel channel = (SocketChannel) key.channel();
             try {
               AsioVisitor m = inferAsioVisitor(protocoldecoder, key);
 
               if (key.isValid() && key.isWritable()) {
-                m.onWrite(key);
+                if (!channel.socket().isOutputShutdown()) {
+                  m.onWrite(key);
+                } else {
+                  key.cancel();
+                }
               }
               if (key.isValid() && key.isReadable()) {
-                m.onRead(key);
+                if (!channel.socket().isInputShutdown()) {
+                  m.onRead(key);
+                } else {
+                  key.cancel();
+                }
               }
               if (key.isValid() && key.isAcceptable()) {
                 m.onAccept(key);
@@ -521,7 +530,7 @@ public enum HttpMethod implements AsioVisitor {
 
               e.printStackTrace();
               key.attach(null);
-              key.channel().close();
+              channel.close();
             }
           }
         }
