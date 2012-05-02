@@ -1,5 +1,6 @@
 package one.xio;
 
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -25,7 +26,12 @@ public interface AsioVisitor {
     @Override
     public void onRead(SelectionKey key) throws Exception {
       System.err.println("fail: " + key.toString());
-      throw new UnsupportedOperationException("found in " + getClass().getCanonicalName());
+      final SocketChannel channel = (SocketChannel) key.channel();
+      final int receiveBufferSize = channel.socket().getReceiveBufferSize();
+      final String trim = HttpMethod.UTF8.decode(ByteBuffer.allocate(receiveBufferSize)).toString().trim();
+
+      throw new UnsupportedOperationException("found " + trim +
+          " in " + getClass().getCanonicalName());
     }
 
     /**
