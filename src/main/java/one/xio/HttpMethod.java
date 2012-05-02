@@ -495,7 +495,7 @@ public enum HttpMethod implements AsioVisitor {
           i.remove();
 
           if (key.isValid()) {
-            final SelectableChannel channel = (SocketChannel) key.channel();
+            final SelectableChannel channel = key.channel();
             try {
               AsioVisitor m = inferAsioVisitor(protocoldecoder, key);
 
