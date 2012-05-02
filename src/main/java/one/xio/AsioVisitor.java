@@ -1,8 +1,10 @@
 package one.xio;
 
 import java.nio.channels.SelectionKey;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
+import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
 /**
@@ -46,8 +48,10 @@ public interface AsioVisitor {
 
     @Override
     public void onAccept(SelectionKey key) throws Exception {
-      System.err.println("fail: " + key.toString());
-      throw new UnsupportedOperationException("found in " + getClass().getCanonicalName());
+
+      ServerSocketChannel c = (ServerSocketChannel) key.channel();
+      final SocketChannel accept = c.accept();
+      HttpMethod.enqueue(accept, OP_READ | OP_WRITE, key.attachment());
 
     }
   }

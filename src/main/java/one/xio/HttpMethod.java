@@ -177,7 +177,7 @@ public enum HttpMethod implements AsioVisitor {
         socketChannel.configureBlocking(false);
         enqueue(socketChannel, SelectionKey.OP_READ, $);
       } catch (IOException e) {
-        e.printStackTrace();  //todo: verify for a purpose
+        e.printStackTrace();
       }
     }
 
@@ -495,19 +495,19 @@ public enum HttpMethod implements AsioVisitor {
           i.remove();
 
           if (key.isValid()) {
-            final SocketChannel channel = (SocketChannel) key.channel();
+            final SelectableChannel channel = (SocketChannel) key.channel();
             try {
               AsioVisitor m = inferAsioVisitor(protocoldecoder, key);
 
               if (key.isValid() && key.isWritable()) {
-                if (!channel.socket().isOutputShutdown()) {
+                if (!((SocketChannel) channel).socket().isOutputShutdown()) {
                   m.onWrite(key);
                 } else {
                   key.cancel();
                 }
               }
               if (key.isValid() && key.isReadable()) {
-                if (!channel.socket().isInputShutdown()) {
+                if (!((SocketChannel) channel).socket().isInputShutdown()) {
                   m.onRead(key);
                 } else {
                   key.cancel();
