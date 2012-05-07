@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.WeakHashMap;
 
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
@@ -22,7 +23,15 @@ public interface AsioVisitor {
 
   void onAccept(SelectionKey key) throws Exception;
 
+
+  final boolean $DBG = null != System.getenv("DEBUG_VISITOR_ORIGINS");
+  WeakHashMap<Impl, String> $origins = $DBG ? new WeakHashMap<Impl, String>() : null;
+
   class Impl implements AsioVisitor {
+    {
+      if ($DBG) $origins.put(this, HttpMethod.wheresWaldo(3) + " \nfrom " + HttpMethod.wheresWaldo(4));
+    }
+
     @Override
     public void onRead(SelectionKey key) throws Exception {
       System.err.println("fail: " + key.toString());

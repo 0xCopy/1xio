@@ -283,6 +283,14 @@ public enum HttpMethod implements AsioVisitor {
     q.add(toArray(channel, op, s));
   }
 
+  public static String wheresWaldo(int... depth) {
+    int d = depth.length > 0 ? depth[0] : 2;
+    final Throwable throwable = new Throwable();
+    final Throwable throwable1 = throwable.fillInStackTrace();
+    final StackTraceElement stackTraceElement = throwable1.getStackTrace()[d];
+    return "\tat " + stackTraceElement.getClassName() + "." + stackTraceElement.getMethodName() + "(" + stackTraceElement.getFileName() + ":" + stackTraceElement.getLineNumber() + ")";
+  }
+
 
   /**
    * deduce a few parse optimizations
@@ -532,6 +540,16 @@ public enum HttpMethod implements AsioVisitor {
               } else
                 System.err.println("BadHandler: " + String.valueOf(attachment));
 
+              if (AsioVisitor.$DBG) {
+                final AsioVisitor asioVisitor = inferAsioVisitor((AsioVisitor) attachment, key);
+                if (asioVisitor instanceof Impl) {
+                  Impl visitor = (Impl) asioVisitor;
+                  if (AsioVisitor.$origins.containsKey(visitor)) {
+                    final String s = AsioVisitor.$origins.get(visitor);
+                    System.err.println("origin" + s);
+                  }
+                }
+              }
               e.printStackTrace();
               key.attach(null);
               channel.close();
