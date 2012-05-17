@@ -280,7 +280,9 @@ public enum HttpMethod implements AsioVisitor {
    * @throws ClosedChannelException
    */
   public static void enqueue(SelectableChannel channel, int op, Object... s) throws ClosedChannelException {
-    q.add(toArray(channel, op, s));
+    final boolean add = q.add(toArray(channel, op, s));
+    final Selector selector1 = getSelector();
+    if (null != selector1) selector1.wakeup();
   }
 
   public static String wheresWaldo(int... depth) {
