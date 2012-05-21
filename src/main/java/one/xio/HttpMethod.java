@@ -236,12 +236,12 @@ public enum HttpMethod implements AsioVisitor {
         } catch (Exception e) {
           CharBuffer methodName = UTF8.decode((ByteBuffer) dst.clear().limit(read));
           System.err.println("BOOM " + methodName);
-          e.printStackTrace();  //todo: verify for a purpose
+          e.printStackTrace();
         }
 
 
       } catch (IOException e) {
-        e.printStackTrace();  //todo: verify for a purpose
+        e.printStackTrace();
       }
     }
 
