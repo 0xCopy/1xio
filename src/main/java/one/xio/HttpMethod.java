@@ -481,10 +481,10 @@ public enum HttpMethod implements AsioVisitor {
     }
 
     //noinspection SynchronizationOnLocalVariableOrMethodParameter
-    init(a, $);
+    init(a, $, 1000);
   }
 
-  public static void init(String[] a, AsioVisitor protocoldecoder) throws IOException {
+  public static void init(String[] a, AsioVisitor protocoldecoder, int timeout) throws IOException {
 
     setSelector(Selector.open());
     selectorThread = Thread.currentThread();
@@ -507,7 +507,7 @@ public enum HttpMethod implements AsioVisitor {
 
           }
         }
-        final int select = selector.select(1000);
+        final int select = selector.select(timeout);
 
         Set<SelectionKey> keys = selector.selectedKeys();
 
