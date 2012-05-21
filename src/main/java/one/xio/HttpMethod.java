@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static java.lang.Character.isWhitespace;
+import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 import static one.xio.HttpStatus.$200;
@@ -289,8 +290,14 @@ public enum HttpMethod implements AsioVisitor {
     int d = depth.length > 0 ? depth[0] : 2;
     final Throwable throwable = new Throwable();
     final Throwable throwable1 = throwable.fillInStackTrace();
-    final StackTraceElement stackTraceElement = throwable1.getStackTrace()[d];
-    return "\tat " + stackTraceElement.getClassName() + "." + stackTraceElement.getMethodName() + "(" + stackTraceElement.getFileName() + ":" + stackTraceElement.getLineNumber() + ")";
+    final StackTraceElement[] stackTrace = throwable1.getStackTrace();
+    String ret = null;
+    for (int i = 2, end = min(stackTrace.length - 1, d); i < end; i++) {
+      StackTraceElement stackTraceElement = stackTrace[i];
+      ret = "\tat " + stackTraceElement.getClassName() + "." + stackTraceElement.getMethodName() + "(" + stackTraceElement.getFileName() + ":" + stackTraceElement.getLineNumber() + ")\n";
+
+    }
+    return ret;
   }
 
 
@@ -543,7 +550,7 @@ public enum HttpMethod implements AsioVisitor {
                 System.err.println("BadHandler: " + String.valueOf(attachment));
 
               if (AsioVisitor.$DBG) {
-                final AsioVisitor asioVisitor = inferAsioVisitor((AsioVisitor) attachment, key);
+                final AsioVisitor asioVisitor = inferAsioVisitor(attachment, key);
                 if (asioVisitor instanceof Impl) {
                   Impl visitor = (Impl) asioVisitor;
                   if (AsioVisitor.$origins.containsKey(visitor)) {
@@ -562,7 +569,7 @@ public enum HttpMethod implements AsioVisitor {
     }
   }
 
-  static AsioVisitor inferAsioVisitor(AsioVisitor default$, SelectionKey key) {
+  static AsioVisitor inferAsioVisitor(Object default$, SelectionKey key) {
     Object attachment = key.attachment();
     if (attachment instanceof Object[]) {
       for (Object o : ((Object[]) attachment)) {
@@ -583,7 +590,7 @@ public enum HttpMethod implements AsioVisitor {
 
     } else {
 
-      m = default$;
+      m = (AsioVisitor) default$;
     }
     return m;
   }

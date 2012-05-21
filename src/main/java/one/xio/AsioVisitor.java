@@ -29,7 +29,7 @@ public interface AsioVisitor {
 
   class Impl implements AsioVisitor {
     {
-      if ($DBG) $origins.put(this, HttpMethod.wheresWaldo(3) + " \nfrom " + HttpMethod.wheresWaldo(4));
+      if ($DBG) $origins.put(this,    HttpMethod.wheresWaldo(4));
     }
 
     @Override
