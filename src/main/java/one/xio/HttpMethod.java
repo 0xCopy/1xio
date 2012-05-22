@@ -292,9 +292,9 @@ public enum HttpMethod implements AsioVisitor {
     final Throwable throwable1 = throwable.fillInStackTrace();
     final StackTraceElement[] stackTrace = throwable1.getStackTrace();
     String ret = null;
-    for (int i = 2, end = min(stackTrace.length - 1, d); i < end; i++) {
+    for (int i = 2, end = min(stackTrace.length - 1, d); i <= end; i++) {
       StackTraceElement stackTraceElement = stackTrace[i];
-      ret = "\tat " + stackTraceElement.getClassName() + "." + stackTraceElement.getMethodName() + "(" + stackTraceElement.getFileName() + ":" + stackTraceElement.getLineNumber() + ")\n";
+      ret += "\tat " + stackTraceElement.getClassName() + "." + stackTraceElement.getMethodName() + "(" + stackTraceElement.getFileName() + ":" + stackTraceElement.getLineNumber() + ")\n";
 
     }
     return ret;
