@@ -29,7 +29,7 @@ public interface AsioVisitor {
 
   class Impl implements AsioVisitor {
     {
-      if ($DBG) $origins.put(this,    HttpMethod.wheresWaldo(4));
+      if ($DBG) $origins.put(this, HttpMethod.wheresWaldo(4));
     }
 
     @Override
@@ -57,7 +57,8 @@ public interface AsioVisitor {
 
     @Override
     public void onWrite(SelectionKey key) throws Exception {
-      System.err.println("fail: " + key.toString());
+      final SocketChannel channel = (SocketChannel) key.channel();
+      System.err.println("buffer underrun?: " + channel.getRemoteAddress());
       throw new UnsupportedOperationException("found in " + getClass().getCanonicalName());
     }
 

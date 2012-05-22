@@ -571,6 +571,8 @@ public enum HttpMethod implements AsioVisitor {
 
   static AsioVisitor inferAsioVisitor(AsioVisitor default$, SelectionKey key) {
     Object attachment = key.attachment();
+    AsioVisitor m;
+    if (null == attachment) m = default$;
     if (attachment instanceof Object[]) {
       for (Object o : ((Object[]) attachment)) {
         attachment = o;
@@ -584,7 +586,6 @@ public enum HttpMethod implements AsioVisitor {
         break;
       }
     }
-    AsioVisitor m;
     if (attachment instanceof AsioVisitor) {
       m = (AsioVisitor) attachment;
 
