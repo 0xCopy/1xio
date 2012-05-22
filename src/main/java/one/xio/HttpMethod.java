@@ -550,7 +550,7 @@ public enum HttpMethod implements AsioVisitor {
                 System.err.println("BadHandler: " + String.valueOf(attachment));
 
               if (AsioVisitor.$DBG) {
-                final AsioVisitor asioVisitor = inferAsioVisitor(attachment, key);
+                final AsioVisitor asioVisitor = inferAsioVisitor((AsioVisitor) protocoldecoder, key);
                 if (asioVisitor instanceof Impl) {
                   Impl visitor = (Impl) asioVisitor;
                   if (AsioVisitor.$origins.containsKey(visitor)) {
@@ -569,7 +569,7 @@ public enum HttpMethod implements AsioVisitor {
     }
   }
 
-  static AsioVisitor inferAsioVisitor(Object default$, SelectionKey key) {
+  static AsioVisitor inferAsioVisitor(AsioVisitor default$, SelectionKey key) {
     Object attachment = key.attachment();
     if (attachment instanceof Object[]) {
       for (Object o : ((Object[]) attachment)) {
