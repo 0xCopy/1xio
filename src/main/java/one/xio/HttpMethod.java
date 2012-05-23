@@ -459,6 +459,10 @@ public enum HttpMethod implements AsioVisitor {
     HttpMethod.selector = selector;
   }
 
+  public static void enqueue(AsioVisitor asioVisitor) {
+    //To change body of created methods use File | Settings | File Templates.
+  }
+
 
   static class CompletionException extends Throwable {
   }
@@ -550,7 +554,7 @@ public enum HttpMethod implements AsioVisitor {
                 System.err.println("BadHandler: " + String.valueOf(attachment));
 
               if (AsioVisitor.$DBG) {
-                final AsioVisitor asioVisitor = inferAsioVisitor((AsioVisitor) protocoldecoder, key);
+                final AsioVisitor asioVisitor = inferAsioVisitor(protocoldecoder, key);
                 if (asioVisitor instanceof Impl) {
                   Impl visitor = (Impl) asioVisitor;
                   if (AsioVisitor.$origins.containsKey(visitor)) {
@@ -591,7 +595,7 @@ public enum HttpMethod implements AsioVisitor {
 
     } else {
 
-      m = (AsioVisitor) default$;
+      m = default$;
     }
     return m;
   }
