@@ -1,9 +1,7 @@
 package one.xio;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.util.WeakHashMap;
 
 import static java.nio.channels.SelectionKey.OP_READ;
@@ -31,6 +29,12 @@ public interface AsioVisitor {
     {
       if ($DBG) $origins.put(this, HttpMethod.wheresWaldo(4));
     }
+
+    public Impl preRead(Object... env) {
+    return this;}
+
+    public Impl prewrite(Object... env) {
+    return this;}
 
     @Override
     public void onRead(SelectionKey key) throws Exception {
