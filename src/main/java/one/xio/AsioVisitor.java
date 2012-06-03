@@ -33,7 +33,7 @@ public interface AsioVisitor {
     public Impl preRead(Object... env) {
     return this;}
 
-    public Impl prewrite(Object... env) {
+    public Impl preWrite(Object... env) {
     return this;}
 
     @Override
