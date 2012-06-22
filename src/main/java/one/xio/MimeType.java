@@ -184,6 +184,7 @@ public enum MimeType {
     jpe ("image/jpeg"),
     jpg ("image/jpeg"),
     js ("application/x-javascript"),
+    json ("application/json"),
     kar ("audio/midi"),
     key ("application/pgp-keys"),
     kil ("application/x-killustrator"),
