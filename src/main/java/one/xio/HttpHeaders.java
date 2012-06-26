@@ -11,8 +11,10 @@ import java.util.Map;
  * Time: 11:37:55 PM
  */
 public enum HttpHeaders {
+  Content$2dType,
   Content$2dLength,
   Content$2dEncoding,
+  Transfer$2dEncoding,
   Host,
   Accept,
   User$2dAgent,;
