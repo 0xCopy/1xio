@@ -17,6 +17,7 @@ public enum HttpHeaders {
   Cookie,
   Content$2dType,
   Content$2dLength,
+  Accept$2dEncoding,
   Content$2dEncoding,
   Transfer$2dEncoding,
   User$2dAgent,
