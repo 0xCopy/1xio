@@ -2,7 +2,6 @@ package one.xio;
 
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -18,7 +17,7 @@ public enum HttpHeaders {
   Accept,
   User$2dAgent,;
 
-  private final CharBuffer header = CharBuffer.wrap(URLDecoder.decode(name().replace('$', '%')));
+  private final String header =   URLDecoder.decode(name().replace('$', '%')) ;
 
   private final ByteBuffer token = HttpMethod.UTF8.encode(header);
 
@@ -53,7 +52,7 @@ public enum HttpHeaders {
     return linkedHashMap;
   }
 
-  public CharBuffer getHeader() {
+  public String  getHeader() {
     return header;
   }
 
