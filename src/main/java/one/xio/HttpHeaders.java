@@ -11,13 +11,17 @@ import java.util.Map;
  * Time: 11:37:55 PM
  */
 public enum HttpHeaders {
+  Host,
+  Accept,
+  ETag,
+  Cookie,
   Content$2dType,
   Content$2dLength,
   Content$2dEncoding,
   Transfer$2dEncoding,
-  Host,
-  Accept,
-  User$2dAgent,;
+  User$2dAgent,
+  Set$2dCookie,
+  ;
 
   private final String header =   URLDecoder.decode(name().replace('$', '%')) ;
 
