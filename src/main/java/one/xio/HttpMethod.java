@@ -5,13 +5,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.FileChannel;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.util.Iterator;
@@ -23,9 +17,7 @@ import static java.lang.Character.isWhitespace;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
-import static one.xio.HttpStatus.$200;
-import static one.xio.HttpStatus.$404;
-import static one.xio.HttpStatus.$501;
+import static one.xio.HttpStatus.*;
 
 /**
  * See  http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -281,16 +273,16 @@ public enum HttpMethod implements AsioVisitor {
      * @throws ClosedChannelException
      */
     public static void enqueue(SelectableChannel channel, int op, Object... s) throws ClosedChannelException {
-        final boolean add = q.add(toArray(channel, op, s));
-        final Selector selector1 = getSelector();
+        boolean add = q.add(toArray(channel, op, s));
+        Selector selector1 = getSelector();
         if (null != selector1) selector1.wakeup();
     }
 
     public static String wheresWaldo(int... depth) {
         int d = depth.length > 0 ? depth[0] : 2;
-        final Throwable throwable = new Throwable();
-        final Throwable throwable1 = throwable.fillInStackTrace();
-        final StackTraceElement[] stackTrace = throwable1.getStackTrace();
+        Throwable throwable = new Throwable();
+        Throwable throwable1 = throwable.fillInStackTrace();
+        StackTraceElement[] stackTrace = throwable1.getStackTrace();
         String ret = "";
         for (int i = 2, end = min(stackTrace.length - 1, d); i <= end; i++) {
             StackTraceElement stackTraceElement = stackTrace[i];
@@ -473,7 +465,7 @@ public enum HttpMethod implements AsioVisitor {
 
         try {
 
-            final ServerSocketChannel serverSocketChannel;
+            ServerSocketChannel serverSocketChannel;
             serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.socket().bind(new java.net.InetSocketAddress(port));
             serverSocketChannel.configureBlocking(false);
@@ -512,7 +504,7 @@ public enum HttpMethod implements AsioVisitor {
 
                     }
                 }
-                final int select = selector.select(timeout);
+                int select = selector.select(timeout);
 
                 timeout = 0 == select ? min(timeout << 1, timeoutMax) :1;
                 if (0 == select) continue;
@@ -523,7 +515,7 @@ public enum HttpMethod implements AsioVisitor {
                     i.remove();
 
                     if (key.isValid()) {
-                        final SelectableChannel channel = key.channel();
+                        SelectableChannel channel = key.channel();
                         try {
                             AsioVisitor m = inferAsioVisitor(protocoldecoder, key);
 
@@ -557,11 +549,11 @@ public enum HttpMethod implements AsioVisitor {
                                 System.err.println("BadHandler: " + String.valueOf(attachment));
 
                             if (AsioVisitor.$DBG) {
-                                final AsioVisitor asioVisitor = inferAsioVisitor(protocoldecoder, key);
+                                AsioVisitor asioVisitor = inferAsioVisitor(protocoldecoder, key);
                                 if (asioVisitor instanceof Impl) {
                                     Impl visitor = (Impl) asioVisitor;
                                     if (AsioVisitor.$origins.containsKey(visitor)) {
-                                        final String s = AsioVisitor.$origins.get(visitor);
+                                        String s = AsioVisitor.$origins.get(visitor);
                                         System.err.println("origin" + s);
                                     }
                                 }

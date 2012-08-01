@@ -13,6 +13,7 @@ import java.util.Map;
 public enum HttpHeaders {
   Host,
   Accept,
+  Expect,
   ETag,
   Cookie,
   Content$2dType,
@@ -21,10 +22,9 @@ public enum HttpHeaders {
   Content$2dEncoding,
   Transfer$2dEncoding,
   User$2dAgent,
-  Set$2dCookie,
-  ;
+  Set$2dCookie,;
 
-  private final String header =   URLDecoder.decode(name().replace('$', '%')) ;
+  private final String header = URLDecoder.decode(name().replace('$', '%'));
 
   private final ByteBuffer token = HttpMethod.UTF8.encode(header);
 
@@ -39,7 +39,7 @@ public enum HttpHeaders {
   public static Map<String, int[]> getHeaders(ByteBuffer headers) {
     headers.rewind();
     int l = headers.limit();
-     Map<String, int[]> linkedHashMap = new LinkedHashMap<String, int[]>();
+    Map<String, int[]> linkedHashMap = new LinkedHashMap<String, int[]>();
     while (headers.hasRemaining() && '\n' != headers.get()) ;
     while (headers.hasRemaining()) {
       int p1 = headers.position();
@@ -59,7 +59,7 @@ public enum HttpHeaders {
     return linkedHashMap;
   }
 
-  public String  getHeader() {
+  public String getHeader() {
     return header;
   }
 
@@ -81,7 +81,8 @@ public enum HttpHeaders {
    */
   public ByteBuffer parse(ByteBuffer slice) {
     slice.position(tokenLen + 2 + slice.position());
-    while (Character.isWhitespace(slice.get(slice.limit() - 1))) slice.limit(slice.limit() - 1);
+    while (Character.isWhitespace(slice.get(slice.limit() - 1)))
+      slice.limit(slice.limit() - 1);
     return slice;
   }
 

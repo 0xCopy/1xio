@@ -45,7 +45,7 @@ public interface AsioVisitor {
             System.err.println("fail: " + key.toString());
             final SocketChannel channel = (SocketChannel) key.channel();
             final int receiveBufferSize = channel.socket().getReceiveBufferSize();
-            final String trim = HttpMethod.UTF8.decode(ByteBuffer.allocate(receiveBufferSize)).toString().trim();
+            final String trim = HttpMethod.UTF8.decode(ByteBuffer.allocateDirect(receiveBufferSize)).toString().trim();
 
             throw new UnsupportedOperationException("found " + trim +
                     " in " + getClass().getCanonicalName());
