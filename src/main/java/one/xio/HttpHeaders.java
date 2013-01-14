@@ -163,9 +163,8 @@ public enum HttpHeaders {
 	 * a closed system which cannot interact with other rendering agents,
 	 * this default set ought to be configurable by the user.
 	 * <p/>
-	 * Accept,
-	 * <p/>
-	 * /**
+	 */ Accept,
+	 /**
 	 * <p/>
 	 * The Accept-Charset request-header field can be used to indicate what character sets are acceptable for the response. This field allows clients capable of understanding more comprehensive or special- purpose character sets to signal that capability to a server which is capable of representing documents in those character sets.
 	 * <p/>
