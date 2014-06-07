@@ -2,12 +2,15 @@ package one.xio;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.WeakHashMap;
 
+import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * User: jim
@@ -15,7 +18,7 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
  * Time: 11:50 PM
  */
 public interface AsioVisitor {
-	final boolean $DBG = null != System.getenv("DEBUG_VISITOR_ORIGINS");
+	boolean $DBG = null != System.getenv("DEBUG_VISITOR_ORIGINS");
 	WeakHashMap<Impl, String> $origins = $DBG
 			? new WeakHashMap<Impl, String>()
 			: null;
@@ -31,24 +34,14 @@ public interface AsioVisitor {
 	class Impl implements AsioVisitor {
 		{
 			if ($DBG)
-				$origins.put(this, HttpMethod.wheresWaldo(4));
-		}
-
-		public Impl preRead(Object... env) {
-			return this;
-		}
-
-		public Impl preWrite(Object... env) {
-			return this;
+				$origins.put(this, wheresWaldo(4));
 		}
 
 		@Override
 		public void onRead(SelectionKey key) throws Exception {
 			System.err.println("fail: " + key.toString());
-			final SocketChannel channel = (SocketChannel) key.channel();
-			final int receiveBufferSize = channel.socket()
-					.getReceiveBufferSize();
-			final String trim = HttpMethod.UTF8.decode(
+			int receiveBufferSize = 4 << 10;
+			String trim = UTF_8.decode(
 					ByteBuffer.allocateDirect(receiveBufferSize)).toString()
 					.trim();
 
@@ -70,20 +63,53 @@ public interface AsioVisitor {
 
 		@Override
 		public void onWrite(SelectionKey key) throws Exception {
-			final SocketChannel channel = (SocketChannel) key.channel();
+			SocketChannel channel = (SocketChannel) key.channel();
 			System.err.println("buffer underrun?: "
 					+ channel.socket().getRemoteSocketAddress());
 			throw new UnsupportedOperationException("found in "
 					+ getClass().getCanonicalName());
 		}
 
+		/**
+		 * HIGHLY unlikely to solve a problem with OP_READ | OP_WRITE,
+		 * each network socket protocol typically requires one or the other but not both.
+		 *
+		 * @param key the serversocket key
+		 * @throws Exception
+		 */
 		@Override
 		public void onAccept(SelectionKey key) throws Exception {
 
 			ServerSocketChannel c = (ServerSocketChannel) key.channel();
-			final SocketChannel accept = c.accept();
-			HttpMethod.enqueue(accept, OP_READ | OP_WRITE, key.attachment());
+			SocketChannel accept = c.accept();
+			accept.configureBlocking(false);
+			accept.register((Selector) key.selector(), OP_READ | OP_WRITE, key
+					.attachment());
 
+		}
+
+		/**
+		 * tracking aid
+		 *
+		 * @param depth typically 2 is correct
+		 * @return a stack trace string that intellij can hyperlink
+		 */
+		public static String wheresWaldo(int... depth) {
+			int d = depth.length > 0 ? depth[0] : 2;
+			Throwable throwable = new Throwable();
+			Throwable throwable1 = throwable.fillInStackTrace();
+			StackTraceElement[] stackTrace = throwable1.getStackTrace();
+			StringBuilder ret = new StringBuilder();
+			for (int i = 2, end = min(stackTrace.length - 1, d); i <= end; i++) {
+				StackTraceElement stackTraceElement = stackTrace[i];
+				ret.append("\tat ").append(stackTraceElement.getClassName())
+						.append(".").append(stackTraceElement.getMethodName())
+						.append("(").append(stackTraceElement.getFileName())
+						.append(":").append(stackTraceElement.getLineNumber())
+						.append(")\n");
+
+			}
+			return ret.toString();
 		}
 	}
 }
