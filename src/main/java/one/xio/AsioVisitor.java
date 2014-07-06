@@ -8,8 +8,7 @@ import java.nio.channels.SocketChannel;
 import java.util.WeakHashMap;
 
 import static java.lang.StrictMath.min;
-import static java.nio.channels.SelectionKey.OP_READ;
-import static java.nio.channels.SelectionKey.OP_WRITE;
+import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
@@ -31,10 +30,91 @@ public interface AsioVisitor {
 
 	void onAccept(SelectionKey key) throws Exception;
 
+	class Helper {
+		public static void toAccept(SelectionKey key, final F f) {
+			key.interestOps(OP_ACCEPT).attach(toAccept(f));
+		}
+
+		public static void toRead(SelectionKey key, final F f) {
+			key.interestOps(OP_READ).attach(toRead(f));
+		}
+
+		public static void toConnect(SelectionKey key, final F f) {
+			key.interestOps(OP_CONNECT).attach(toConnect(f));
+		}
+
+		public static void toWrite(SelectionKey key, final F f) {
+			key.interestOps(OP_WRITE).attach(toWrite(f));
+		}
+
+		public static Impl toAccept(final F f) {
+			return new Impl() {
+				@Override
+				public void onAccept(SelectionKey key) throws Exception {
+					f.apply(key);
+				}
+			};
+		}
+
+		public static Impl toRead(final F f) {
+			return new Impl() {
+				@Override
+				public void onRead(SelectionKey key) throws Exception {
+					f.apply(key);
+				}
+			};
+		}
+		public static Impl toWrite(final F f) {
+			return new Impl() {
+				@Override
+				public void onWrite(SelectionKey key) throws Exception {
+					f.apply(key);
+				}
+			};
+		}
+
+		public static Impl toConnect(final F f) {
+			return new Impl() {
+				@Override
+				public void onConnect(SelectionKey key) throws Exception {
+					f.apply(key);
+				}
+			};
+		}
+
+		public interface F {
+			void apply(SelectionKey key) throws Exception;
+		}
+	}
+
 	class Impl implements AsioVisitor {
 		{
 			if ($DBG)
 				$origins.put(this, wheresWaldo(4));
+		}
+
+		/**
+		 * tracking aid
+		 *
+		 * @param depth typically 2 is correct
+		 * @return a stack trace string that intellij can hyperlink
+		 */
+		public static String wheresWaldo(int... depth) {
+			int d = depth.length > 0 ? depth[0] : 2;
+			Throwable throwable = new Throwable();
+			Throwable throwable1 = throwable.fillInStackTrace();
+			StackTraceElement[] stackTrace = throwable1.getStackTrace();
+			StringBuilder ret = new StringBuilder();
+			for (int i = 2, end = min(stackTrace.length - 1, d); i <= end; i++) {
+				StackTraceElement stackTraceElement = stackTrace[i];
+				ret.append("\tat ").append(stackTraceElement.getClassName())
+						.append(".").append(stackTraceElement.getMethodName())
+						.append("(").append(stackTraceElement.getFileName())
+						.append(":").append(stackTraceElement.getLineNumber())
+						.append(")\n");
+
+			}
+			return ret.toString();
 		}
 
 		@Override
@@ -86,30 +166,6 @@ public interface AsioVisitor {
 			accept.register((Selector) key.selector(), OP_READ | OP_WRITE, key
 					.attachment());
 
-		}
-
-		/**
-		 * tracking aid
-		 *
-		 * @param depth typically 2 is correct
-		 * @return a stack trace string that intellij can hyperlink
-		 */
-		public static String wheresWaldo(int... depth) {
-			int d = depth.length > 0 ? depth[0] : 2;
-			Throwable throwable = new Throwable();
-			Throwable throwable1 = throwable.fillInStackTrace();
-			StackTraceElement[] stackTrace = throwable1.getStackTrace();
-			StringBuilder ret = new StringBuilder();
-			for (int i = 2, end = min(stackTrace.length - 1, d); i <= end; i++) {
-				StackTraceElement stackTraceElement = stackTrace[i];
-				ret.append("\tat ").append(stackTraceElement.getClassName())
-						.append(".").append(stackTraceElement.getMethodName())
-						.append("(").append(stackTraceElement.getFileName())
-						.append(":").append(stackTraceElement.getLineNumber())
-						.append(")\n");
-
-			}
-			return ret.toString();
 		}
 	}
 }
