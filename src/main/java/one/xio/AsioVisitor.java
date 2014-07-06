@@ -41,10 +41,12 @@ public interface AsioVisitor {
 
 		public static void toRead(SelectionKey key, final F f) {
 			key.interestOps(OP_READ).attach(toRead(f));
+			key.selector().wakeup();
 		}
 
 		public static void toRead(SelectionKey key, Impl impl) {
 			key.interestOps(OP_ACCEPT).attach(impl);
+			key.selector().wakeup();
 		}
 
 		public static void toConnect(SelectionKey key, final F f) {
@@ -53,6 +55,7 @@ public interface AsioVisitor {
 
 		public static void toConnect(SelectionKey key, Impl impl) {
 			key.interestOps(OP_CONNECT).attach(impl);
+			key.selector().wakeup();
 		}
 
 		public static void toWrite(SelectionKey key, final F f) {
@@ -61,6 +64,7 @@ public interface AsioVisitor {
 
 		public static void toWrite(SelectionKey key, Impl impl) {
 			key.interestOps(OP_WRITE).attach(impl);
+			key.selector().wakeup();
 		}
 
 		public static Impl toAccept(final F f) {
