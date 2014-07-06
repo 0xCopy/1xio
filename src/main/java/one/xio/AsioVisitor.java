@@ -32,24 +32,40 @@ public interface AsioVisitor {
 
 	class Helper {
 		public static void toAccept(SelectionKey key, final F f) {
-			key.interestOps(OP_ACCEPT).attach(toAccept(f));
+			toAccept(key, toAccept(f));
+		}
+
+		public static void toAccept(SelectionKey key, Impl impl) {
+			toRead(key, impl);
 		}
 
 		public static void toRead(SelectionKey key, final F f) {
 			key.interestOps(OP_READ).attach(toRead(f));
 		}
 
+		public static void toRead(SelectionKey key, Impl impl) {
+			key.interestOps(OP_ACCEPT).attach(impl);
+		}
+
 		public static void toConnect(SelectionKey key, final F f) {
-			key.interestOps(OP_CONNECT).attach(toConnect(f));
+			toConnect(key, toConnect(f));
+		}
+
+		public static void toConnect(SelectionKey key, Impl impl) {
+			key.interestOps(OP_CONNECT).attach(impl);
 		}
 
 		public static void toWrite(SelectionKey key, final F f) {
-			key.interestOps(OP_WRITE).attach(toWrite(f));
+			toWrite(key, toWrite(f));
+		}
+
+		public static void toWrite(SelectionKey key, Impl impl) {
+			key.interestOps(OP_WRITE).attach(impl);
 		}
 
 		public static Impl toAccept(final F f) {
 			return new Impl() {
-				@Override
+
 				public void onAccept(SelectionKey key) throws Exception {
 					f.apply(key);
 				}
@@ -58,7 +74,7 @@ public interface AsioVisitor {
 
 		public static Impl toRead(final F f) {
 			return new Impl() {
-				@Override
+
 				public void onRead(SelectionKey key) throws Exception {
 					f.apply(key);
 				}
@@ -66,7 +82,7 @@ public interface AsioVisitor {
 		}
 		public static Impl toWrite(final F f) {
 			return new Impl() {
-				@Override
+
 				public void onWrite(SelectionKey key) throws Exception {
 					f.apply(key);
 				}
@@ -75,7 +91,7 @@ public interface AsioVisitor {
 
 		public static Impl toConnect(final F f) {
 			return new Impl() {
-				@Override
+
 				public void onConnect(SelectionKey key) throws Exception {
 					f.apply(key);
 				}
@@ -117,7 +133,6 @@ public interface AsioVisitor {
 			return ret.toString();
 		}
 
-		@Override
 		public void onRead(SelectionKey key) throws Exception {
 			System.err.println("fail: " + key.toString());
 			int receiveBufferSize = 4 << 10;
@@ -135,13 +150,11 @@ public interface AsioVisitor {
 		 * @param key
 		 * @throws Exception
 		 */
-		@Override
 		public void onConnect(SelectionKey key) throws Exception {
 			if (((SocketChannel) key.channel()).finishConnect())
 				key.interestOps(OP_WRITE);
 		}
 
-		@Override
 		public void onWrite(SelectionKey key) throws Exception {
 			SocketChannel channel = (SocketChannel) key.channel();
 			System.err.println("buffer underrun?: "
@@ -157,7 +170,6 @@ public interface AsioVisitor {
 		 * @param key the serversocket key
 		 * @throws Exception
 		 */
-		@Override
 		public void onAccept(SelectionKey key) throws Exception {
 
 			ServerSocketChannel c = (ServerSocketChannel) key.channel();
