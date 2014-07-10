@@ -1,5 +1,6 @@
 package one.xio;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.WeakHashMap;
@@ -27,26 +28,68 @@ public interface AsioVisitor {
 
 	void onAccept(SelectionKey key) throws Exception;
 
+	/**
+	 * marker
+	 */
+	interface SslVisitor extends AsioVisitor {
+		/**
+		 * performs IO on behalf of SslEngine negotiation as client-mode
+		 */
+		interface ClientSslTask extends SslVisitor {
+		}
+
+		/**
+		 * performs IO on behalf of SslEngine negotiation as server-mode
+		 */
+		interface ServerSslTask extends SslVisitor {
+		}
+	}
+
+	class FSM {
+
+		public static int read(SelectionKey key, ByteBuffer payload)
+				throws IOException {
+
+			return read((ReadableByteChannel) key.channel(), payload);
+		}
+
+		public static int write(SelectionKey key, ByteBuffer payload)
+				throws IOException {
+			return write((WritableByteChannel) key.channel(), payload);
+		}
+
+		public static int read(ReadableByteChannel channel, ByteBuffer cursor)
+				throws IOException {
+			return channel.read(cursor);
+		}
+
+		public static int write(WritableByteChannel channel1, ByteBuffer payload)
+				throws IOException {
+			return channel1.write(payload);
+		}
+	}
+
 	class Helper {
-		public static void toAccept(SelectionKey key, final F f) {
+		public static void toAccept(SelectionKey key, F f) {
 			toAccept(key, toAccept(f));
 		}
 
 		public static void toAccept(SelectionKey key, Impl impl) {
-			toRead(key, impl);
+			key.interestOps(OP_ACCEPT).attach(impl);
+			key.selector().wakeup();
 		}
 
-		public static void toRead(SelectionKey key, final F f) {
+		public static void toRead(SelectionKey key, F f) {
 			key.interestOps(OP_READ).attach(toRead(f));
 			key.selector().wakeup();
 		}
 
 		public static void toRead(SelectionKey key, Impl impl) {
-			key.interestOps(OP_ACCEPT).attach(impl);
+			key.interestOps(OP_READ).attach(impl);
 			key.selector().wakeup();
 		}
 
-		public static void toConnect(SelectionKey key, final F f) {
+		public static void toConnect(SelectionKey key, F f) {
 			toConnect(key, toConnect(f));
 		}
 
@@ -55,7 +98,7 @@ public interface AsioVisitor {
 			key.selector().wakeup();
 		}
 
-		public static void toWrite(SelectionKey key, final F f) {
+		public static void toWrite(SelectionKey key, F f) {
 			toWrite(key, toWrite(f));
 		}
 
@@ -105,11 +148,10 @@ public interface AsioVisitor {
 
 		public static Impl finishRead(final ByteBuffer payload,
 				final Runnable success) {
-			return Helper.toRead(new F() {
+			return toRead(new F() {
 				public void apply(SelectionKey key) throws Exception {
 					if (payload.hasRemaining()) {
-						int read = ((ReadableByteChannel) key.channel())
-								.read(payload);
+						int read = FSM.read(key, payload);
 						if (read == -1)
 							key.cancel();
 					}
@@ -145,12 +187,11 @@ public interface AsioVisitor {
 		}
 
 		public static Impl finishWrite(final Runnable success,
-				final ByteBuffer... payload) {
+				ByteBuffer... payload) {
 			final ByteBuffer cursor = coalesceBuffers(payload);
 			return toWrite(new F() {
 				public void apply(SelectionKey key) throws Exception {
-					int write = ((WritableByteChannel) key.channel())
-							.write(cursor);
+					int write = FSM.write(key, cursor);
 					if (-1 == write)
 						key.cancel();
 					if (!cursor.hasRemaining())
@@ -158,6 +199,7 @@ public interface AsioVisitor {
 				}
 			});
 		}
+
 		public static Impl finishWrite(ByteBuffer payload, Runnable onSuccess) {
 			return finishWrite(onSuccess, payload);
 		}
@@ -166,12 +208,12 @@ public interface AsioVisitor {
 				ByteBuffer... payload) {
 			toWrite(key, finishWrite(onSuccess, payload));
 		}
+
 		public static Impl finishRead(final ByteBuffer payload, final F success) {
-			return Helper.toRead(new F() {
+			return toRead(new F() {
 				public void apply(SelectionKey key) throws Exception {
 					if (payload.hasRemaining()) {
-						int read = ((ReadableByteChannel) key.channel())
-								.read(payload);
+						int read = FSM.read(key, payload);
 						if (read == -1)
 							key.cancel();
 					}
@@ -180,18 +222,17 @@ public interface AsioVisitor {
 				}
 			});
 		}
+
 		public static void finishRead(SelectionKey key, ByteBuffer payload,
 				F success) {
 			toRead(key, finishRead(payload, success));
 		}
 
-		public static Impl finishWrite(final F success,
-				final ByteBuffer... payload) {
+		public static Impl finishWrite(final F success, ByteBuffer... payload) {
 			final ByteBuffer cursor = coalesceBuffers(payload);
 			return toWrite(new F() {
 				public void apply(SelectionKey key) throws Exception {
-					int write = ((WritableByteChannel) key.channel())
-							.write(cursor);
+					int write = FSM.write(key, cursor);
 					if (-1 == write)
 						key.cancel();
 					if (!cursor.hasRemaining())
