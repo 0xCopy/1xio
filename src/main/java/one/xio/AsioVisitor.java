@@ -1,13 +1,21 @@
 package one.xio;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLSessionContext;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
+import java.util.Map;
 import java.util.WeakHashMap;
 
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static javax.net.ssl.SSLEngineResult.HandshakeStatus;
+import static one.xio.AsioVisitor.Helper.*;
 
 /**
  * User: jim
@@ -31,11 +39,18 @@ public interface AsioVisitor {
 	/**
 	 * marker
 	 */
-	interface SslVisitor extends AsioVisitor {
+	interface SslVisitor extends F {
+		ByteBuffer getFromSSL();
+
+		ByteBuffer getToSSL();
+
+		SSLEngine getSslEngine();
+
 		/**
 		 * performs IO on behalf of SslEngine negotiation as client-mode
 		 */
 		interface ClientSslTask extends SslVisitor {
+
 		}
 
 		/**
@@ -43,23 +58,237 @@ public interface AsioVisitor {
 		 */
 		interface ServerSslTask extends SslVisitor {
 		}
+
+		class Minimal {
+			public static ClientSslTask server(
+					final String... nonAuthoritativeHostname) {
+				return new ClientSslTask() {
+					private ByteBuffer fromSSL = ByteBuffer
+							.allocateDirect(4 << 10);
+					private ByteBuffer ToSSL = ByteBuffer.allocate(4 << 10);
+					private SSLEngine sslEngine;
+					private SSLSessionContext sessionContext;
+
+					@Override
+					public void apply(SelectionKey key) throws Exception {
+						sslEngine = (nonAuthoritativeHostname.length > 0
+								? nonAuthoritativeHostname
+								: null) == null
+								? SSLContext.getDefault().createSSLEngine()
+								: SSLContext
+										.getDefault()
+										.createSSLEngine(
+												(nonAuthoritativeHostname.length > 0
+														? nonAuthoritativeHostname
+														: null)[0],
+												((InetSocketAddress) ((SocketChannel) key
+														.channel())
+														.getRemoteAddress())
+														.getPort());
+						sessionContext = SSLContext.getDefault()
+								.getClientSessionContext();
+					}
+
+					public ByteBuffer getFromSSL() {
+						return fromSSL;
+					}
+
+					public void setFromSSL(ByteBuffer fromSSL) {
+						this.fromSSL = fromSSL;
+					}
+
+					public ByteBuffer getToSSL() {
+						return ToSSL;
+					}
+
+					public void setToSSL(ByteBuffer toSSL) {
+						ToSSL = toSSL;
+					}
+
+					public SSLEngine getSslEngine() {
+						return sslEngine;
+					}
+
+					public void setSslEngine(SSLEngine sslEngine) {
+						this.sslEngine = sslEngine;
+					}
+				};
+			}
+
+			public static ClientSslTask client(
+					final String... nonAuthoritativeHostname) {
+				return new ClientSslTask() {
+					private ByteBuffer fromSSL = ByteBuffer
+							.allocateDirect(4 << 10);
+					private ByteBuffer ToSSL = ByteBuffer.allocate(4 << 10);
+					private SSLEngine sslEngine;
+					private SSLSessionContext sessionContext;
+
+					@Override
+					public void apply(SelectionKey key) throws Exception {
+						sslEngine = (nonAuthoritativeHostname.length > 0
+								? nonAuthoritativeHostname
+								: null) == null
+								? SSLContext.getDefault().createSSLEngine()
+								: SSLContext
+										.getDefault()
+										.createSSLEngine(
+												(nonAuthoritativeHostname.length > 0
+														? nonAuthoritativeHostname
+														: null)[0],
+												((InetSocketAddress) ((SocketChannel) key
+														.channel())
+														.getRemoteAddress())
+														.getPort());
+						sessionContext = SSLContext.getDefault()
+								.getClientSessionContext();
+
+					}
+
+					public ByteBuffer getFromSSL() {
+						return fromSSL;
+					}
+
+					public void setFromSSL(ByteBuffer fromSSL) {
+						this.fromSSL = fromSSL;
+					}
+
+					public ByteBuffer getToSSL() {
+						return ToSSL;
+					}
+
+					public void setToSSL(ByteBuffer toSSL) {
+						ToSSL = toSSL;
+					}
+
+					public SSLEngine getSslEngine() {
+						return sslEngine;
+					}
+
+					public void setSslEngine(SSLEngine sslEngine) {
+						this.sslEngine = sslEngine;
+					}
+				};
+			}
+		}
 	}
 
 	class FSM {
+		/**
+		 * for scale, the gc needs to be other than CGC or the thrashing of keys will produce floating keys based on gc scans.
+		 */
+		static Map<SelectionKey, SslVisitor> sslSessions = new WeakHashMap<SelectionKey, SslVisitor>();
+		static Map<SelectionKey, HandshakeStatus> sslStatus = new WeakHashMap<SelectionKey, HandshakeStatus>();
+		static Map<SelectionKey, ByteBuffer> oob = new WeakHashMap<SelectionKey, ByteBuffer>();
 
-		public static int read(SelectionKey key, ByteBuffer payload)
+		public static final ByteBuffer NIL = ByteBuffer.allocate(0);
+
+		/**
+		 * possible unplanned write occurs during a read request.
+		 *
+		 * @param key
+		 * @param payload
+		 * @return
+		 * @throws IOException
+		 */
+		public static int read(final SelectionKey key, ByteBuffer payload)
 				throws IOException {
+			HandshakeStatus handshakeStatus1 = sslStatus.get(sslStatus);
 
+			SslVisitor sslVisitor = sslSessions.get(key);
+			if (null != sslVisitor) {
+				SSLEngine sslEngine = sslVisitor.getSslEngine();
+				if (HandshakeStatus.NEED_WRAP == sslStatus.get(key)) {
+					ByteBuffer toSSL = sslVisitor.getToSSL();
+					SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) NIL
+							.rewind(), (ByteBuffer) toSSL);
+					((SocketChannel) key.channel()).write((ByteBuffer) toSSL
+							.flip());
+					HandshakeStatus handshakeStatus = wrap.getHandshakeStatus();
+					sslStatus.put(key, handshakeStatus);
+
+					toSSL.compact();
+					return 0;
+				} else {
+					ByteBuffer byteBuffer = oob.get(key);
+					if (null != byteBuffer) {
+						int remaining = payload.remaining();
+						if (byteBuffer.remaining() <= remaining) {
+							payload.put(byteBuffer);
+							oob.remove(key);
+						} else {
+							payload.put((ByteBuffer) byteBuffer.slice().limit(
+									remaining));
+							byteBuffer.position(byteBuffer.position()
+									+ remaining);
+							byteBuffer.compact();
+						}
+					}
+					ByteBuffer fromSSL = sslVisitor.getFromSSL();
+					SSLEngineResult unwrap = sslEngine.unwrap(
+							(ByteBuffer) fromSSL.flip(), payload);//todo: if oob triggers,and payload has 0 remaining, will this pop?
+					int read = ((SocketChannel) key.channel()).read(fromSSL);
+					HandshakeStatus handshakeStatus = unwrap
+							.getHandshakeStatus();
+					sslStatus.put(key, handshakeStatus);
+					fromSSL.compact();
+					return unwrap.bytesProduced();
+				}
+			}
 			return read((ReadableByteChannel) key.channel(), payload);
 		}
 
-		public static int write(SelectionKey key, ByteBuffer payload)
+		/**
+		 * possible unplanned write occurs during a write request.
+		 *
+		 * @param key
+		 * @param payload
+		 * @return
+		 * @throws IOException
+		 */
+		public static int write(final SelectionKey key, ByteBuffer payload)
 				throws IOException {
-			return write((WritableByteChannel) key.channel(), payload);
+			HandshakeStatus handshakeStatus1 = sslStatus.get(sslStatus);
+
+			SslVisitor sslVisitor = sslSessions.get(key);
+			if (null != sslVisitor) {
+				SSLEngine sslEngine = sslVisitor.getSslEngine();
+				if (HandshakeStatus.NEED_UNWRAP == sslStatus.get(key)) {
+					ByteBuffer tmpOob = ByteBuffer.allocateDirect(4 << 10);
+					ByteBuffer fromSSL = sslVisitor.getFromSSL();
+					SSLEngineResult unwrap = sslEngine.unwrap(fromSSL, tmpOob);
+					ByteBuffer byteBuffer = oob.get(key);
+					oob.put(key, (ByteBuffer) (null != byteBuffer ? ByteBuffer
+							.allocate(
+									byteBuffer.remaining()
+											+ tmpOob.flip().remaining()).put(
+									byteBuffer).put(tmpOob).flip() : tmpOob
+							.flip()));
+					((SocketChannel) key.channel()).write((ByteBuffer) fromSSL
+							.flip());
+					HandshakeStatus handshakeStatus = unwrap
+							.getHandshakeStatus();
+					sslStatus.put(key, handshakeStatus);
+					fromSSL.compact();
+					return 0;
+				} else {
+					ByteBuffer toSSL = sslVisitor.getToSSL();
+					SSLEngineResult wrap = sslEngine.wrap(payload, toSSL);
+
+					int write = ((SocketChannel) key.channel())
+							.write((ByteBuffer) toSSL.flip());
+					HandshakeStatus handshakeStatus = wrap.getHandshakeStatus();
+					sslStatus.put(key, handshakeStatus);
+					toSSL.compact();
+					return wrap.bytesProduced();
+				}
+			}
+			return write((SocketChannel) key.channel(), payload);
 		}
 
 		public static int read(ReadableByteChannel channel, ByteBuffer cursor)
 				throws IOException {
+
 			return channel.read(cursor);
 		}
 
