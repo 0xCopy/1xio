@@ -595,7 +595,7 @@ public enum HttpHeaders {
 
 	public boolean recognize(ByteBuffer buffer) {
 
-		final int i = buffer.position();
+		int i = buffer.position();
 		boolean ret = false;
 		if ((buffer.get(tokenLen + i) & 0xff) == ':') {
 
@@ -609,7 +609,7 @@ public enum HttpHeaders {
 		return ret;
 	}
 
-	static public int getSendBufferSize() {
+	public static int getSendBufferSize() {
 		return 4 << 10;
 	}
 }

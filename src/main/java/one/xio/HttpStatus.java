@@ -89,6 +89,6 @@ public enum HttpStatus {
 	public final String caption;
 
 	HttpStatus(String caption) {
-		this.caption = caption;;
-	}
+		this.caption = caption;
+    }
 }
