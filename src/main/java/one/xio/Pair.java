@@ -24,7 +24,6 @@ public class Pair<A, B> {
 		return b;
 	}
 
-	@Override
 	public boolean equals(Object o) {
 		if (this != o) {
 			if (o instanceof Pair) {
@@ -41,7 +40,6 @@ public class Pair<A, B> {
 		return true;
 	}
 
-	@Override
 	public int hashCode() {
 		int result = null != a ? a.hashCode() : 0;
 		result = 31 * result + (null != b ? b.hashCode() : 0);
