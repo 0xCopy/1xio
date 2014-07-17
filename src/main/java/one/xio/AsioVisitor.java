@@ -38,67 +38,232 @@ public interface AsioVisitor {
   void onWrite(SelectionKey key) throws Exception;
 
   void onAccept(SelectionKey key) throws Exception;
+class FSM{
+  public static final boolean DEBUG_SENDJSON = Config.get("DEBUG_SENDJSON", "false").equals(
+      "true");
+  public static Thread selectorThread;
+  public static Selector selector;
+  public static Map<SelectionKey, SSLEngine> sslState = new WeakHashMap<>();
+  /**
+   * stores {InterestOps,{attachment}}
+   */
+  public static Map<SelectionKey, Pair<Integer, Object>> sslGoal = new WeakHashMap<>();
+  private static ExecutorService executorService;
 
-  class Helper {
-    public static final ByteBuffer[] NIL = new ByteBuffer[]{};
-    public static Thread selectorThread;
-    public static Selector selector;
-    public static Map<SelectionKey, SSLEngine> sslState = new WeakHashMap<>();
-    /**
-     * stores {InterestOps,{attachment}}
-     */
-    public static Map<SelectionKey, Pair<Integer, Object>> sslGoal = new WeakHashMap<>();
-    private static ExecutorService executorService;
-
-    /**
-     * handles SslEngine state NEED_TASK.creates a phaser and launches all threads with invokeAll
-     */
-    public static int delegateTasks(Pair<SelectionKey, SSLEngine> state, final Runnable newOps) {
-      final SelectionKey key = state.getA();
-      final int origOps = key.interestOps();
-      List<Callable<Void>> runnables = new ArrayList<>();
-      Runnable t;
-      final AtomicReference<CyclicBarrier> barrier = new AtomicReference<>();
-      final SSLEngine sslEngine = state.getB();
-      while (null != (t = sslEngine.getDelegatedTask())) {
-        final Runnable finalT1 = t;
-        runnables.add(new Callable<Void>() {
-          public Void call() throws Exception {
-            finalT1.run();
-            barrier.get().await(3, TimeUnit.MINUTES);
-            return null;
-          }
-        });
-      }
-      barrier.set(new CyclicBarrier(runnables.size(), new Runnable() {
-        @Override
-        public void run() {
-          System.err.println("!!! cyclibarrier hit.  " + sslEngine + " " + sslEngine.getSession() + " " + Arrays.deepToString(sslEngine.getHandshakeSession().getValueNames()));
-          try {
-            TimeUnit.MILLISECONDS.sleep(250);
-          } catch (InterruptedException e) {
-            e.printStackTrace();
-          }
+  /**
+   * handles SslEngine state NEED_TASK.creates a phaser and launches all threads with invokeAll
+   */
+  public static int delegateTasks(Pair<SelectionKey, SSLEngine> state, final Runnable newOps) {
+    final SelectionKey key = state.getA();
+    final int origOps = key.interestOps();
+    List<Callable<Void>> runnables = new ArrayList<>();
+    Runnable t;
+    final AtomicReference<CyclicBarrier> barrier = new AtomicReference<>();
+    final SSLEngine sslEngine = state.getB();
+    while (null != (t = sslEngine.getDelegatedTask())) {
+      final Runnable finalT1 = t;
+      runnables.add(new Callable<Void>() {
+        public Void call() throws Exception {
+          finalT1.run();
+          barrier.get().await(3, TimeUnit.MINUTES);
+          return null;
+        }
+      });
+    }
+    barrier.set(new CyclicBarrier(runnables.size(), new Runnable() {
+      @Override
+      public void run() {
+        System.err.println("!!! cyclibarrier hit.  " + sslEngine + " " + sslEngine.getSession() + " " + Arrays.deepToString(sslEngine.getHandshakeSession().getValueNames()));
+        try {
+          TimeUnit.MILLISECONDS.sleep(250);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
 //          sslBacklog.fromNet.on(key, null);
 //          sslBacklog.toNet.on(key,null);
-          if (null != newOps) {
-            System.err.println("!!! firing newOp");
-            newOps.run();
-          } else {
-            System.err.println("!!! waking Up previous op");
-            key.interestOps(origOps).selector().wakeup();
-          }
+        if (null != newOps) {
+          System.err.println("!!! firing newOp");
+          newOps.run();
+        } else {
+          System.err.println("!!! waking Up previous op");
+          key.interestOps(origOps).selector().wakeup();
         }
-      }));
-
-      try {
-        key.interestOps(0);
-        executorService.invokeAll(runnables);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
       }
-      return 0;
+    }));
+
+    try {
+      key.interestOps(0);
+      executorService.invokeAll(runnables);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     }
+    return 0;
+  }
+
+  public static void setExecutorService(ExecutorService svc) {
+    executorService = svc;
+  }
+
+  /**
+   * this is a beast.
+   */
+  public static void handShake(final Pair<SelectionKey, SSLEngine> state) {
+
+    SSLEngine sslEngine = state.getB();
+
+    HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
+    System.err.println("hs: " + handshakeStatus);
+    switch (handshakeStatus) {
+      case NEED_TASK:
+        delegateTasks(state, new Runnable() {
+          public void run() {
+            handShake(state);
+          }
+        });
+        return;
+      case NOT_HANDSHAKING:
+      case FINISHED:
+        SelectionKey key = state.getA();
+        Pair<Integer, Object> integerObjectPair = sslGoal.remove(key);
+        sslState.put(key, sslEngine);
+        Integer a = integerObjectPair.getA();
+        Object b = integerObjectPair.getB();
+        key.interestOps(a).attach(b);
+        key.selector().wakeup();
+        return;
+      case NEED_WRAP:
+        needWrap(state);
+        return;
+      case NEED_UNWRAP:
+        needUnwrap(state);
+    }
+  }
+
+  public static void needUnwrap(Pair<SelectionKey, SSLEngine> state) {
+    SelectionKey key = state.getA();
+
+    SSLEngine sslEngine = state.getB();
+    ByteBuffer fromNet = sslBacklog.fromNet.resume(state);
+    ByteBuffer toApp = sslBacklog.toApp.resume(state);
+    System.err.println("unwrap1: " + fromNet.toString());
+    try {
+//if(0==fromNet.position()){needNetUnwrap(state);return;}
+      SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), sslBacklog.toApp.resume(state));
+      System.err.println("unwrap2a: " + unwrap);
+      System.err.println("unwrap2b: " + fromNet.toString());
+
+      Status status = unwrap.getStatus();
+      switch (status) {
+        case BUFFER_UNDERFLOW:
+          fromNet.compact();
+          needNetUnwrap(state);
+          break;
+        case BUFFER_OVERFLOW:
+          sslBacklog.toApp.on(key, doubleBuffer((ByteBuffer) toApp.flip()));
+          handShake(state);
+          break;
+        case OK://sslBacklog.fromNet.on(key, duplicate.compact());
+          fromNet.compact();
+          handShake(state);
+          break;
+        case CLOSED:
+          throw new Error("client closed");
+      }
+
+    } catch (SSLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private static ByteBuffer doubleBuffer(ByteBuffer src) {
+    return ByteBuffer.allocateDirect(src.capacity() << 1).put(src);
+  }
+
+  private static void needNetUnwrap(final Pair<SelectionKey, SSLEngine> state) {
+
+    SelectionKey key = state.getA();
+    final ByteBuffer fromNet = sslBacklog.fromNet.resume(state);
+    final ByteBuffer toApp = sslBacklog.toApp.resume(state);
+
+    Helper.toRead(key, new Helper.F() {
+      public void apply(SelectionKey key) throws Exception {
+        int read = ((SocketChannel) key.channel()).read(fromNet);
+        System.err.println("hsread: " + read);
+        SSLEngine sslEngine = state.getB();
+
+        SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), toApp);
+        System.err.println("nunwrap2:" + unwrap);
+        System.err.println("nunwrap2a: " + fromNet.toString());
+        switch (unwrap.getStatus()) {
+          case BUFFER_UNDERFLOW:
+            SelectionKey on = sslBacklog.fromNet.on(key, doubleBuffer((ByteBuffer) fromNet.flip()));
+            handShake(state);
+            break;
+          case BUFFER_OVERFLOW:
+            sslBacklog.toApp.on(key, doubleBuffer((ByteBuffer) toApp.flip()));
+            handShake(state);
+            break;
+          case OK:
+            fromNet.compact();
+            break;
+          case CLOSED:
+            break;
+        }
+        key.interestOps(0);
+        handShake(state);
+      }
+    });
+  }
+
+  public static void needWrap(Pair<SelectionKey, SSLEngine> state) {
+    ByteBuffer resume = sslBacklog.toNet.resume(state);
+    ByteBuffer toNet = sslBacklog.toNet.resume(state);
+    try {
+
+      SSLEngine sslEngine = state.getB();
+      SSLEngineResult wrap = sslEngine.wrap(Helper.NIL, toNet);
+      System.err.println("wrap2:" + wrap);
+      System.err.println("wrap2a: " + toNet.toString());
+      if (0 < wrap.bytesProduced()) {
+        SelectionKey key = state.getA();
+        ((SocketChannel) key.channel()).write((ByteBuffer) toNet.flip());
+      }
+      toNet.compact();
+      handShake(state);
+    } catch (SSLException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  enum sslBacklog {
+    fromNet, toNet, fromApp, toApp;
+    public Map<SelectionKey, ByteBuffer> per = new WeakHashMap<>();
+
+    public ByteBuffer resume(Pair<SelectionKey, SSLEngine> state) {
+      SelectionKey key = state.getA();
+      ByteBuffer buffer = on(key);
+      if (null == buffer) {
+        SSLEngine sslEngine = state.getB();
+        on(key, buffer = ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize()));
+      }
+      return buffer;
+    }
+
+    public ByteBuffer on(SelectionKey key) {
+      ByteBuffer byteBufferPairPair = per.get(key);
+      return byteBufferPairPair;
+    }
+
+    public SelectionKey on(SelectionKey key, ByteBuffer buffer) {
+      per.put(key, buffer);
+      return key;
+    }
+  }
+}
+  class Helper {
+    public static final ByteBuffer[] NIL = new ByteBuffer[]{};
 
     public static void toAccept(SelectionKey key, F f) {
       toAccept(key, toAccept(f));
@@ -169,11 +334,11 @@ public interface AsioVisitor {
     }
 
     public static Selector getSelector() {
-      return selector;
+      return FSM.selector;
     }
 
     public static void setSelector(Selector selector) {
-      Helper.selector = selector;
+      FSM.selector = selector;
     }
 
     public static Impl finishRead(final ByteBuffer payload,
@@ -289,13 +454,13 @@ public interface AsioVisitor {
       SocketChannel channel = (SocketChannel) key.channel();
       int origin = dest.position();
 
-      SSLEngine sslEngine = sslState.get(key);
+      SSLEngine sslEngine = FSM.sslState.get(key);
       int read = 0;
       if (null != sslEngine) {
 
 
-        ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
-        ByteBuffer toApp = sslBacklog.toApp.resume(pair(key, sslEngine));
+        ByteBuffer fromNet = FSM.sslBacklog.fromNet.resume(pair(key, sslEngine));
+        ByteBuffer toApp = FSM.sslBacklog.toApp.resume(pair(key, sslEngine));
         int read1 = channel.read(fromNet);
         System.err.println("r1: "+read1);
         System.err.println("r1a: from "+fromNet);
@@ -353,11 +518,11 @@ public interface AsioVisitor {
     }
 
     public static int write(SelectionKey key, ByteBuffer fromApp) throws IOException {
-      SSLEngine sslEngine = sslState.get(key);
+      SSLEngine sslEngine = FSM.sslState.get(key);
       int write = 0;
       if (null != sslEngine) {
         try {
-          ByteBuffer toNet = sslBacklog.toNet.resume(pair(key, sslEngine));
+          ByteBuffer toNet = FSM.sslBacklog.toNet.resume(pair(key, sslEngine));
           System.err.println("w:fa:0 " + fromApp);
           System.err.println("w:tn:0 " + toNet);
           SSLEngineResult sslEngineResult = sslEngine.wrap(fromApp, toNet);
@@ -385,9 +550,9 @@ public interface AsioVisitor {
                 case NEED_TASK:
                 case NEED_WRAP:
                 case NEED_UNWRAP:
-                  sslGoal.put(key, new Pair<>(key.interestOps(), key.attachment()));
+                  FSM.sslGoal.put(key, new Pair<>(key.interestOps(), key.attachment()));
                   Pair<SelectionKey, SSLEngine> state = pair(key, sslEngine);
-                  handShake(state);
+                  FSM.handShake(state);
                   break;
               }
             case CLOSED:
@@ -401,168 +566,6 @@ public interface AsioVisitor {
 
       return write;
 
-    }
-
-    public static void setExecutorService(ExecutorService svc) {
-      executorService = svc;
-    }
-
-    /**
-     * this is a beast.
-     */
-    public static void handShake(final Pair<SelectionKey, SSLEngine> state) {
-
-      SSLEngine sslEngine = state.getB();
-
-      HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
-      System.err.println("hs: " + handshakeStatus);
-      switch (handshakeStatus) {
-        case NEED_TASK:
-          delegateTasks(state, new Runnable() {
-            public void run() {
-              handShake(state);
-            }
-          });
-          return;
-        case NOT_HANDSHAKING:
-        case FINISHED:
-          SelectionKey key = state.getA();
-          Pair<Integer, Object> integerObjectPair = sslGoal.remove(key);
-          sslState.put(key, sslEngine);
-          Integer a = integerObjectPair.getA();
-          Object b = integerObjectPair.getB();
-          key.interestOps(a).attach(b);
-          key.selector().wakeup();
-          return;
-        case NEED_WRAP:
-          needWrap(state);
-          return;
-        case NEED_UNWRAP:
-          needUnwrap(state);
-      }
-    }
-
-    public static void needUnwrap(Pair<SelectionKey, SSLEngine> state) {
-      SelectionKey key = state.getA();
-
-      SSLEngine sslEngine = state.getB();
-      ByteBuffer fromNet = sslBacklog.fromNet.resume(state);
-      ByteBuffer toApp = sslBacklog.toApp.resume(state);
-      System.err.println("unwrap1: " + fromNet.toString());
-      try {
-//if(0==fromNet.position()){needNetUnwrap(state);return;}
-        SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), sslBacklog.toApp.resume(state));
-        System.err.println("unwrap2a: " + unwrap);
-        System.err.println("unwrap2b: " + fromNet.toString());
-
-        Status status = unwrap.getStatus();
-        switch (status) {
-          case BUFFER_UNDERFLOW:
-            fromNet.compact();
-            needNetUnwrap(state);
-            break;
-          case BUFFER_OVERFLOW:
-            sslBacklog.toApp.on(key, doubleBuffer((ByteBuffer) toApp.flip()));
-            handShake(state);
-            break;
-          case OK://sslBacklog.fromNet.on(key, duplicate.compact());
-            fromNet.compact();
-            handShake(state);
-            break;
-          case CLOSED:
-            throw new Error("client closed");
-        }
-
-      } catch (SSLException e) {
-        e.printStackTrace();
-      }
-    }
-
-    private static ByteBuffer doubleBuffer(ByteBuffer src) {
-      return ByteBuffer.allocateDirect(src.capacity() << 1).put(src);
-    }
-
-    private static void needNetUnwrap(final Pair<SelectionKey, SSLEngine> state) {
-
-      SelectionKey key = state.getA();
-      final ByteBuffer fromNet = sslBacklog.fromNet.resume(state);
-      final ByteBuffer toApp = sslBacklog.toApp.resume(state);
-
-      toRead(key, new F() {
-        public void apply(SelectionKey key) throws Exception {
-          int read = ((SocketChannel) key.channel()).read(fromNet);
-          System.err.println("hsread: " + read);
-          SSLEngine sslEngine = state.getB();
-
-          SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), toApp);
-          System.err.println("nunwrap2:" + unwrap);
-          System.err.println("nunwrap2a: " + fromNet.toString());
-          switch (unwrap.getStatus()) {
-            case BUFFER_UNDERFLOW:
-              SelectionKey on = sslBacklog.fromNet.on(key, doubleBuffer((ByteBuffer) fromNet.flip()));
-              handShake(state);
-              break;
-            case BUFFER_OVERFLOW:
-              sslBacklog.toApp.on(key, doubleBuffer((ByteBuffer) toApp.flip()));
-              handShake(state);
-              break;
-            case OK:
-              fromNet.compact();
-              break;
-            case CLOSED:
-              break;
-          }
-          key.interestOps(0);
-          handShake(state);
-        }
-      });
-    }
-
-    public static void needWrap(Pair<SelectionKey, SSLEngine> state) {
-      ByteBuffer resume = sslBacklog.toNet.resume(state);
-      ByteBuffer toNet = sslBacklog.toNet.resume(state);
-      try {
-
-        SSLEngine sslEngine = state.getB();
-        SSLEngineResult wrap = sslEngine.wrap(NIL, toNet);
-        System.err.println("wrap2:" + wrap);
-        System.err.println("wrap2a: " + toNet.toString());
-        if (0 < wrap.bytesProduced()) {
-          SelectionKey key = state.getA();
-          ((SocketChannel) key.channel()).write((ByteBuffer) toNet.flip());
-        }
-        toNet.compact();
-        handShake(state);
-      } catch (SSLException e) {
-        e.printStackTrace();
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
-
-    enum sslBacklog {
-      fromNet, toNet, fromApp, toApp;
-      public Map<SelectionKey, ByteBuffer> per = new WeakHashMap<>();
-
-      public ByteBuffer resume(Pair<SelectionKey, SSLEngine> state) {
-        SelectionKey key = state.getA();
-        ByteBuffer buffer = on(key);
-        if (null == buffer) {
-          SSLEngine sslEngine = state.getB();
-          on(key, buffer = ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize()));
-        }
-        return buffer;
-      }
-
-      public ByteBuffer on(SelectionKey key) {
-        ByteBuffer byteBufferPairPair = per.get(key);
-        return byteBufferPairPair;
-      }
-
-      public SelectionKey on(SelectionKey key, ByteBuffer buffer) {
-        per.put(key, buffer);
-        return key;
-      }
     }
 
     public interface F {
