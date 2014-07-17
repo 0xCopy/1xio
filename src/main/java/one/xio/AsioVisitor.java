@@ -285,54 +285,65 @@ public interface AsioVisitor {
       return read(((SocketChannel) channel).keyFor(getSelector()), fromNet);
     }
 
-    public static int read(SelectionKey key, ByteBuffer fromNet) throws IOException {
+    public static int read(SelectionKey key, ByteBuffer dest) throws IOException {
       SocketChannel channel = (SocketChannel) key.channel();
-      int origin = fromNet.position();
-      int read = channel.read(fromNet);
-      if (-1 != read) {
+      int origin = dest.position();
 
-        SSLEngine sslEngine = sslState.get(key);
-        if (null != sslEngine) {
-
-          int packetBufferSize = sslEngine.getSession().getPacketBufferSize();
+      SSLEngine sslEngine = sslState.get(key);
+      int read = 0;
+      if (null != sslEngine) {
 
 
-          int applicationBufferSize = sslEngine.getSession().getApplicationBufferSize();
-          ByteBuffer byteBuffer1 = ByteBuffer.allocateDirect(applicationBufferSize);//todo: recycle
-          fromNet.clear();
-          fromNet.put((ByteBuffer) byteBuffer1.flip());
-          read = fromNet.limit() - origin;
+        ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
+        ByteBuffer toApp = sslBacklog.toApp.resume(pair(key, sslEngine));
+        int read1 = channel.read(fromNet);
+        System.err.println("r1: "+read1);
+        System.err.println("r1a: from "+fromNet);
+        System.err.println("r1b: dest "+dest);
+        System.err.println("r1c: ta   "+toApp);
+        int destRemaining = dest.remaining();
+        boolean backlogWaiting = toApp.flip().hasRemaining()||read1>dest.remaining();
+        toApp.compact();
+        SSLEngineResult unwrap = null;
+        if (backlogWaiting) {
 
-          SSLEngineResult sslEngineResult = sslEngine.unwrap((ByteBuffer) fromNet.flip(), byteBuffer1);
-          HandshakeStatus handshakeStatus = sslEngineResult.getHandshakeStatus();
-          Status status = sslEngineResult.getStatus();
-          switch (status) {
-            case BUFFER_UNDERFLOW:
-              break;
-            case BUFFER_OVERFLOW:
-              break;
-            case OK:
-              break;
-            case CLOSED:
-              channel.socket().close();
-              break;
+
+          unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), toApp);
+          System.err.println("<<? "+UTF_8.decode((ByteBuffer) toApp.duplicate().flip()));
+          int taRemaining = toApp.flip().remaining();
+          if (destRemaining > taRemaining) {
+            //dest is big enough.
+            dest.put(toApp);
+            toApp.compact();
+          } else {
+            //dest is a subset of backlog.
+            int position = toApp.position();
+            dest.put((ByteBuffer) toApp.slice().limit(destRemaining));
+            ((ByteBuffer) toApp.position(position + destRemaining)).compact();
           }
-          if (null != handshakeStatus)
-            switch (handshakeStatus) {
-              case NOT_HANDSHAKING:
-              case FINISHED:
-                break;
-              case NEED_TASK:
-              case NEED_WRAP:
-              case NEED_UNWRAP:
-                throw new IOException("renegotiation requested from peer.  not implemented here for security reasons.");
-            }
+        } else {
+          unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), dest);
         }
-        return read;
-      } else {
-        channel.close();
-        return -1;
-      }
+        read=dest.position()-origin;
+        System.err.println("unwrap");
+        switch (unwrap.getStatus()) {
+          case BUFFER_UNDERFLOW:
+            break;
+          case BUFFER_OVERFLOW:
+            break;
+          case OK:
+            fromNet.compact();
+            System.err.println("r2: "+read1);
+            System.err.println("r2a: from "+fromNet);
+            System.err.println("r2b: dest "+dest);
+            System.err.println("r2c: ta   " + toApp);
+            break;
+          case CLOSED:
+            break;
+        }
+      } else
+        read = channel.read(dest);
+      return read;
     }
 
     public static int write(Channel channel, ByteBuffer fromApp) throws IOException {
@@ -417,7 +428,10 @@ public interface AsioVisitor {
         case FINISHED:
           SelectionKey key = state.getA();
           Pair<Integer, Object> integerObjectPair = sslGoal.remove(key);
-          key.interestOps(integerObjectPair.getA()).attach(integerObjectPair.getB());
+          sslState.put(key, sslEngine);
+          Integer a = integerObjectPair.getA();
+          Object b = integerObjectPair.getB();
+          key.interestOps(a).attach(b);
           key.selector().wakeup();
           return;
         case NEED_WRAP:
