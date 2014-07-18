@@ -1,7 +1,9 @@
 package one.xio;
 
-public class Config {
-
+/**
+ * non-public config class for FSM specific configs
+ */
+final class Config {
 	public static String get(String ox_var, String... defaultVal) {
 		String javapropname = "1xio."
 				+ ox_var.toLowerCase().replaceAll("^1xio_", "").replace('_',

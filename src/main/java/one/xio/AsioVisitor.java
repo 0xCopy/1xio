@@ -1,5 +1,8 @@
 package one.xio;
 
+import one.xio.AsioVisitor.FSM.sslBacklog;
+import one.xio.AsioVisitor.Helper.F;
+
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
@@ -26,7 +29,7 @@ import static one.xio.Pair.pair;
  * Time: 11:50 PM
  */
 public interface AsioVisitor {
-  boolean $DBG = null != System.getenv("DEBUG_VISITOR_ORIGINS");
+  boolean $DBG = "true".equals(Config.get("DEBUG_VISITOR_ORIGINS", "false"));
   Map<Impl, String> $origins = $DBG
       ? new WeakHashMap<Impl, String>()
       : null;
@@ -93,6 +96,7 @@ class FSM{
 
     try {
       key.interestOps(0);
+      assert executorService!=null:"must install FSM executorService!";
       executorService.invokeAll(runnables);
     } catch (InterruptedException e) {
       e.printStackTrace();
@@ -108,11 +112,12 @@ class FSM{
    * this is a beast.
    */
   public static void handShake(final Pair<SelectionKey, SSLEngine> state) {
-
+    if(!state.getA().isValid())return;
     SSLEngine sslEngine = state.getB();
 
     HandshakeStatus handshakeStatus = sslEngine.getHandshakeStatus();
     System.err.println("hs: " + handshakeStatus);
+
     switch (handshakeStatus) {
       case NEED_TASK:
         delegateTasks(state, new Runnable() {
@@ -185,12 +190,13 @@ class FSM{
     final ByteBuffer fromNet = sslBacklog.fromNet.resume(state);
     final ByteBuffer toApp = sslBacklog.toApp.resume(state);
 
-    Helper.toRead(key, new Helper.F() {
+    Helper.toRead(key, new F() {
       public void apply(SelectionKey key) throws Exception {
         int read = ((SocketChannel) key.channel()).read(fromNet);
         System.err.println("hsread: " + read);
         SSLEngine sslEngine = state.getB();
-
+        System.err.println("nunwrap1a: " + fromNet.toString());
+        System.err.println("?<< https://"+UTF_8.decode((ByteBuffer) fromNet.duplicate().flip()));//fromNet.flip()
         SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), toApp);
         System.err.println("nunwrap2:" + unwrap);
         System.err.println("nunwrap2a: " + fromNet.toString());
@@ -451,6 +457,7 @@ class FSM{
     }
 
     public static int read(SelectionKey key, ByteBuffer dest) throws IOException {
+      if(!key.isValid())return -1;
       SocketChannel channel = (SocketChannel) key.channel();
       int origin = dest.position();
 
@@ -459,9 +466,10 @@ class FSM{
       if (null != sslEngine) {
 
 
-        ByteBuffer fromNet = FSM.sslBacklog.fromNet.resume(pair(key, sslEngine));
-        ByteBuffer toApp = FSM.sslBacklog.toApp.resume(pair(key, sslEngine));
+        ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
+        ByteBuffer toApp = sslBacklog.toApp.resume(pair(key, sslEngine));
         int read1 = channel.read(fromNet);
+        if(-1==read1)key.cancel();
         System.err.println("r1: "+read1);
         System.err.println("r1a: from "+fromNet);
         System.err.println("r1b: dest "+dest);
@@ -522,7 +530,7 @@ class FSM{
       int write = 0;
       if (null != sslEngine) {
         try {
-          ByteBuffer toNet = FSM.sslBacklog.toNet.resume(pair(key, sslEngine));
+          ByteBuffer toNet = sslBacklog.toNet.resume(pair(key, sslEngine));
           System.err.println("w:fa:0 " + fromApp);
           System.err.println("w:tn:0 " + toNet);
           SSLEngineResult sslEngineResult = sslEngine.wrap(fromApp, toNet);
@@ -540,12 +548,11 @@ class FSM{
               switch (handshakeStatus) {
                 case NOT_HANDSHAKING:
                 case FINISHED:
-                  write = ((SocketChannel) key.channel()).write((ByteBuffer) toNet.flip());
-                  System.err.println("w:w:2 " + write);
+                  write=sslEngineResult.bytesConsumed();
+                  System.err.println("w:w:2 " +  ((SocketChannel) key.channel()).write((ByteBuffer) toNet.flip()));
                   System.err.println("w:tn:2 " + toNet);
                   toNet.compact();
                   System.err.println("w:tn:3 " + toNet);
-
                   break;
                 case NEED_TASK:
                 case NEED_WRAP:
