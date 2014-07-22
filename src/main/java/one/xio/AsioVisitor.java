@@ -58,11 +58,11 @@ public interface AsioVisitor {
      * handles SslEngine state NEED_TASK.creates a phaser and launches all threads with invokeAll
      */
     public static void delegateTasks(final Pair<SelectionKey, SSLEngine> state) throws InterruptedException {
-      final SelectionKey key = state.getA();
+      SelectionKey key = state.getA();
       List<Callable<Void>> runnables = new ArrayList<>();
       Runnable t;
       final AtomicReference<CyclicBarrier> barrier = new AtomicReference<>();
-      final SSLEngine sslEngine = state.getB();
+      SSLEngine sslEngine = state.getB();
       while (null != (t = sslEngine.getDelegatedTask())) {
         final Runnable finalT1 = t;
         runnables.add(new Callable<Void>() {
@@ -96,7 +96,7 @@ public interface AsioVisitor {
     /**
      * this is a beast.
      */
-    public static void handShake(final Pair<SelectionKey, SSLEngine> state) throws Exception {
+    public static void handShake(Pair<SelectionKey, SSLEngine> state) throws Exception {
       if (!state.getA().isValid()) return;
       SSLEngine sslEngine = state.getB();
 
@@ -169,29 +169,29 @@ public interface AsioVisitor {
     }
 
 
-    public static void needWrap(final Pair<SelectionKey, SSLEngine> state) throws Exception {
+    public static void needWrap(Pair<SelectionKey, SSLEngine> state) throws Exception {
       ByteBuffer resume = sslBacklog.toNet.resume(state);
-      final ByteBuffer toNet = sslBacklog.toNet.resume(state);
+      ByteBuffer toNet = sslBacklog.toNet.resume(state);
 
       SSLEngine sslEngine = state.getB();
       SSLEngineResult wrap = sslEngine.wrap(Helper.NIL, toNet);
       System.err.println("wrap: " + wrap);
       switch (wrap.getStatus()) {
         case BUFFER_UNDERFLOW:
-        throw new Error("not supposed to happen here");
+          throw new Error("not supposed to happen here");
         case OK:
 
           SocketChannel channel = (SocketChannel) state.getA().channel();
           channel.write((ByteBuffer) toNet.flip());
           toNet.compact();
           handShake(state);
-           return;
+          return;
         case BUFFER_OVERFLOW:
-        throw new Error("buffer size impossible");
+          throw new Error("buffer size impossible");
         case CLOSED:
           state.getA().cancel();
-        return;
-       }
+          return;
+      }
 
     }
 
@@ -423,24 +423,24 @@ public interface AsioVisitor {
       ByteBuffer toNet = sslBacklog.toNet.resume(pair(key, sslEngine));
       ByteBuffer fromApp = sslBacklog.fromApp.resume(pair(key, sslEngine));
       ByteBuffer origin = src.duplicate();
-      SSLEngineResult wrap = sslEngine.wrap(new ByteBuffer[]{(ByteBuffer) fromApp.flip(), src}, toNet);
-      System.err.println("write:wrap: " + wrap);
+      cat(src, fromApp);
+      SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
       cat(src, fromApp.compact());
+      System.err.println("write:wrap: " + wrap);
+
+
       switch (wrap.getHandshakeStatus()) {
         case NOT_HANDSHAKING:
         case FINISHED:
           Status status = wrap.getStatus();
           switch (status) {
-            case BUFFER_UNDERFLOW:
-              break;
             case BUFFER_OVERFLOW:
+            case OK:
               SocketChannel channel = (SocketChannel) key.channel();
               int ignored = channel.write((ByteBuffer) toNet.flip());
               toNet.compact();
 
-            case OK:
               int i = src.position() - origin.position();
-
               return i;
 
             case CLOSED:
@@ -465,22 +465,21 @@ public interface AsioVisitor {
         read = ((SocketChannel) key.channel()).read(toApp);
         return read;
       }
-      ByteBuffer fromNet = sslBacklog.toNet.resume(pair(key, sslEngine));
-      ByteBuffer overflow = sslBacklog.fromApp.resume(pair(key, sslEngine));
+      final ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
+        read = ((SocketChannel) key.channel()).read(fromNet);
+      ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
       ByteBuffer origin = toApp.duplicate();
+      SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), overflow);
       cat((ByteBuffer) overflow.flip(), toApp);
-      SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), new ByteBuffer[]{toApp, overflow.compact()});
-      System.err.println("read:unwrap: " + unwrap);
+      overflow.compact();
       fromNet.compact();
+      System.err.println("read:unwrap: " + unwrap);
       Status status = unwrap.getStatus();
       switch (unwrap.getHandshakeStatus()) {
         case NOT_HANDSHAKING:
         case FINISHED:
           switch (status) {
             case BUFFER_UNDERFLOW:
-              SocketChannel channel = (SocketChannel) key.channel();
-              int ignored = channel.read(fromNet);
-              key.selector().wakeup();
             case BUFFER_OVERFLOW:
             case OK:
               int i = toApp.position() - origin.position();
@@ -501,6 +500,12 @@ public interface AsioVisitor {
       }
 
       return 0;
+    }
+
+    public static void sslPop(SelectionKey key) {
+      Pair<Integer, Object> remove = FSM.sslGoal.remove(key);
+      key.interestOps(remove.getA()).attach(remove.getB());
+      key.selector().wakeup();
     }
 
     public static void sslPush(SelectionKey key, SSLEngine engine) throws Exception {
