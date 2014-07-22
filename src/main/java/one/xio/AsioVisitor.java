@@ -425,7 +425,7 @@ public interface AsioVisitor {
       ByteBuffer origin = src.duplicate();
       cat(src, fromApp);
       SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
-      cat(src, fromApp.compact());
+       fromApp.compact();
       System.err.println("write:wrap: " + wrap);
 
 
@@ -441,8 +441,7 @@ public interface AsioVisitor {
               toNet.compact();
 
               int i = src.position() - origin.position();
-              return i;
-
+              return i; 
             case CLOSED:
               key.cancel();
               return -1;
@@ -480,7 +479,8 @@ public interface AsioVisitor {
         case FINISHED:
           switch (status) {
             case BUFFER_UNDERFLOW:
-            case BUFFER_OVERFLOW:
+              if(-1==read)key.cancel();
+
             case OK:
               int i = toApp.position() - origin.position();
               return i;
