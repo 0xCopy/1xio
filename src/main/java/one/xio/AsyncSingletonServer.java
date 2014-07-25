@@ -1,5 +1,9 @@
 package one.xio;
 
+import one.xio.AsioVisitor.FSM;
+import one.xio.AsioVisitor.Helper;
+import one.xio.AsioVisitor.Impl;
+
 import java.io.IOException;
 import java.nio.channels.*;
 import java.util.Iterator;
@@ -31,24 +35,24 @@ public interface AsyncSingletonServer {
      */
     public static void enqueue(SelectableChannel channel, int op, Object... s) {
       assert channel != null && !killswitch.get() : "Server appears to have shut down, cannot enqueue";
-      if (Thread.currentThread() == AsioVisitor.FSM.selectorThread)
+      if (Thread.currentThread() == FSM.selectorThread)
         try {
-          channel.register(AsioVisitor.Helper.getSelector(), op, s);
+          channel.register(Helper.getSelector(), op, s);
         } catch (ClosedChannelException e) {
           e.printStackTrace();
         }
       else {
         q.add(new Object[] {channel, op, s});
       }
-      Selector selector1 = AsioVisitor.Helper.getSelector();
+      Selector selector1 = Helper.getSelector();
       if (null != selector1)
         selector1.wakeup();
     }
 
     public static void init(AsioVisitor protocoldecoder) throws IOException {
 
-      AsioVisitor.Helper.setSelector(Selector.open());
-      AsioVisitor.FSM.selectorThread = Thread.currentThread();
+      Helper.setSelector(Selector.open());
+      FSM.selectorThread = Thread.currentThread();
 
       long timeoutMax = 1024, timeout = 1;
 
@@ -56,7 +60,7 @@ public interface AsyncSingletonServer {
         while (!q.isEmpty()) {
           Object[] s = q.remove();
           SelectableChannel x = (SelectableChannel) s[0];
-          Selector sel = AsioVisitor.Helper.getSelector();
+          Selector sel = Helper.getSelector();
           Integer op = (Integer) s[1];
           Object att = s[2];
 
@@ -68,7 +72,7 @@ public interface AsyncSingletonServer {
             e.printStackTrace();
           }
         }
-        int select = AsioVisitor.FSM.selector.select(timeout);
+        int select = FSM.selector.select(timeout);
 
         timeout = 0 == select ? min(timeout << 1, timeoutMax) : 1;
         if (0 != select)
@@ -77,7 +81,7 @@ public interface AsyncSingletonServer {
     }
 
     public static void innerloop(AsioVisitor protocoldecoder) throws IOException {
-      Set<SelectionKey> keys = AsioVisitor.FSM.selector.selectedKeys();
+      Set<SelectionKey> keys = FSM.selector.selectedKeys();
 
       for (Iterator<SelectionKey> i = keys.iterator(); i.hasNext();) {
         SelectionKey key = i.next();
@@ -119,8 +123,8 @@ public interface AsyncSingletonServer {
 
             if (AsioVisitor.$DBG) {
               AsioVisitor asioVisitor = inferAsioVisitor(protocoldecoder, key);
-              if (asioVisitor instanceof AsioVisitor.Impl) {
-                AsioVisitor.Impl visitor = (AsioVisitor.Impl) asioVisitor;
+              if (asioVisitor instanceof Impl) {
+                Impl visitor = (Impl) asioVisitor;
                 if (AsioVisitor.$origins.containsKey(visitor)) {
                   String s = AsioVisitor.$origins.get(visitor);
                   System.err.println("origin" + s);

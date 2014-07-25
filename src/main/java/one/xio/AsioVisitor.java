@@ -302,6 +302,7 @@ public interface AsioVisitor {
 
     public static Impl finishRead(final ByteBuffer payload,
                                   final Runnable success) {
+
       return Helper.toRead(new F() {
         public void apply(SelectionKey key) throws Exception {
           if (payload.hasRemaining()) {
@@ -317,7 +318,10 @@ public interface AsioVisitor {
 
     public static void finishRead(SelectionKey key, ByteBuffer payload,
                                   Runnable success) {
+      if(payload.hasRemaining())
       toRead(key, finishRead(payload, success));
+      else
+        success.run();
     }
 
     public static ByteBuffer coalesceBuffers(ByteBuffer... payload) {
@@ -343,6 +347,7 @@ public interface AsioVisitor {
     public static Impl finishWrite(final Runnable success,
                                    ByteBuffer... payload) {
       final ByteBuffer cursor = coalesceBuffers(payload);
+
       return toWrite(new F() {
         public void apply(SelectionKey key) throws Exception {
           int write = write(key, cursor);
@@ -383,8 +388,8 @@ public interface AsioVisitor {
     }
 
     public static Impl finishWrite(final F success,
-                                   ByteBuffer... payload) {
-      final ByteBuffer cursor = coalesceBuffers(payload);
+                                   final ByteBuffer  cursor) {
+
       return toWrite(new F() {
         public void apply(SelectionKey key) throws Exception {
           int write = write(key, cursor);
@@ -396,13 +401,20 @@ public interface AsioVisitor {
       });
     }
 
-    public static Impl finishWrite(ByteBuffer payload, F onSuccess) {
-      return finishWrite(onSuccess, payload);
+    public static void finishWrite(ByteBuffer payload, F onSuccess) {
+      finishWrite(onSuccess, payload);
     }
 
     public static void finishWrite(SelectionKey key, F onSuccess,
                                    ByteBuffer... payload) {
-      toWrite(key, finishWrite(onSuccess, payload));
+      final ByteBuffer cursor = coalesceBuffers(payload);
+      if(cursor.hasRemaining())
+      toWrite(key, finishWrite(onSuccess, cursor));else
+        try {
+          onSuccess.apply(key);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
     }
 
     public static int read(Channel channel, ByteBuffer fromNet) throws Exception {
