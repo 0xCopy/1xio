@@ -8,14 +8,12 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.lang.StrictMath.min;
@@ -149,6 +147,7 @@ public interface AsioVisitor {
             }
           });
           key.selector().wakeup();
+
           break;
         case OK:
           handShake(state);
@@ -162,10 +161,6 @@ public interface AsioVisitor {
           break;
 
       }
-    }
-
-    private static ByteBuffer doubleBuffer(ByteBuffer src) {
-      return ByteBuffer.allocateDirect(src.capacity() << 1).put(src);
     }
 
 
@@ -190,7 +185,6 @@ public interface AsioVisitor {
           throw new Error("buffer size impossible");
         case CLOSED:
           state.getA().cancel();
-          return;
       }
 
     }
@@ -223,6 +217,8 @@ public interface AsioVisitor {
 
   class Helper {
     public static final ByteBuffer[] NIL = new ByteBuffer[]{};
+    public static final TimeUnit REALTIME_UNIT = TimeUnit.valueOf(Config.get("REALTIME_UNIT",TimeUnit.MINUTES.name()));
+    public static Integer REALTIME_CUTOFF = Integer.parseInt(Config.get("REALTIME_CUTOFF","3"));
 
     public static void toAccept(SelectionKey key, F f) {
       toAccept(key, toAccept(f));
@@ -384,7 +380,12 @@ public interface AsioVisitor {
 
     public static void finishRead(SelectionKey key, ByteBuffer payload,
                                   F success) {
-      toRead(key, finishRead(payload, success));
+      if(payload.hasRemaining())
+      toRead(key, finishRead(payload, success));else try {
+        success.apply(key);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
     }
 
     public static Impl finishWrite(final F success,
@@ -536,11 +537,42 @@ public interface AsioVisitor {
 
     }
 
+    public static ByteBuffer growBuffer(ByteBuffer src) {
+      return ByteBuffer.allocateDirect(src.capacity() << 1).put(src);
+    }
+
+    /**
+     * preserves previous key state, then does a finish-read operation, blocks thread.
+     * @param key
+     * @param payload
+     * @throws InterruptedException
+     * @throws BrokenBarrierException
+     * @throws TimeoutException
+     */
+
+    public static void syncFill(SelectionKey key, ByteBuffer payload) throws InterruptedException, BrokenBarrierException, TimeoutException {
+      final CyclicBarrier finishChunk= new CyclicBarrier(2);
+      final int oldOps = key.interestOps();
+      final Object attachment = key.attachment();
+      F success = new F() {
+        @Override
+        public void apply(SelectionKey key) throws Exception {
+          key.interestOps(oldOps).attach(attachment);
+          key.selector().wakeup();
+          finishChunk.await();
+        }
+      };
+      finishRead(key, payload, success);
+      finishChunk.await(REALTIME_CUTOFF, REALTIME_UNIT);
+    }
+
+    public static void debugBBuf(ByteBuffer nextChunk) {
+      System.err.println("%%: "+ UTF_8.decode(nextChunk.duplicate()));
+    }
+
     public interface F {
       void apply(SelectionKey key) throws Exception;
     }
-
-
   }
 
   class Impl implements AsioVisitor {
