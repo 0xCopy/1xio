@@ -114,13 +114,12 @@ public interface AsyncSingletonServer {
             }
           } catch (Throwable e) {
             Object attachment = key.attachment();
-            if (attachment instanceof Object[]) {
+            if (!(attachment instanceof Object[])) {
+              System.err.println("BadHandler: " + String.valueOf(attachment));
+            } else {
               Object[] objects = (Object[]) attachment;
               System.err.println("BadHandler: " + java.util.Arrays.deepToString(objects));
-
-            } else
-              System.err.println("BadHandler: " + String.valueOf(attachment));
-
+            }
             if (AsioVisitor.$DBG) {
               AsioVisitor asioVisitor = inferAsioVisitor(protocoldecoder, key);
               if (asioVisitor instanceof Impl) {

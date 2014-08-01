@@ -3,23 +3,32 @@ package one.xio;
 import one.xio.AsioVisitor.FSM.sslBacklog;
 import one.xio.AsioVisitor.Helper.Do.post;
 import one.xio.AsioVisitor.Helper.Do.pre;
+import one.xio.AsyncSingletonServer.SingleThreadSingletonServer;
 
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
+import java.net.InetSocketAddress;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static one.xio.AsioVisitor.Helper.Do.pre.flip;
+import static one.xio.AsioVisitor.Helper.on;
 import static one.xio.Pair.pair;
 
 /**
@@ -165,20 +174,21 @@ public interface AsioVisitor {
 
 
     public static void needWrap(Pair<SelectionKey, SSLEngine> state) throws Exception {
-      ByteBuffer resume = sslBacklog.toNet.resume(state);
+
       ByteBuffer toNet = sslBacklog.toNet.resume(state);
+      ByteBuffer fromApp = sslBacklog.fromApp.resume(state);
 
       SSLEngine sslEngine = state.getB();
-      SSLEngineResult wrap = sslEngine.wrap(Helper.NIL, toNet);
+      SSLEngineResult wrap = sslEngine.wrap(on(fromApp, flip), toNet);
       System.err.println("wrap: " + wrap);
       switch (wrap.getStatus()) {
         case BUFFER_UNDERFLOW:
           throw new Error("not supposed to happen here");
         case OK:
-
           SocketChannel channel = (SocketChannel) state.getA().channel();
           channel.write((ByteBuffer) toNet.flip());
           toNet.compact();
+          fromApp.compact();
           handShake(state);
           return;
         case BUFFER_OVERFLOW:
@@ -220,38 +230,83 @@ public interface AsioVisitor {
     public static final TimeUnit REALTIME_UNIT = TimeUnit.valueOf(Config.get("REALTIME_UNIT", TimeUnit.MINUTES.name()));
     public static final Integer REALTIME_CUTOFF = Integer.parseInt(Config.get("REALTIME_CUTOFF", "3"));
 
+
+    /**
+     * called once client is connected, but before any bytes are read or written from socket.
+     *
+     * @param host        ssl remote host
+     * @param port        ssl remote port
+     * @param asioVisitor
+     * @param clientOps   ussually OP_WRITE but OP_READ for non-http protocols as well
+     * @throws Exception
+     */
+    public static void sslClient(final String host, final int port, final Impl asioVisitor, final int clientOps) throws Exception {
+      SocketChannel open = SocketChannel.open();
+      open.configureBlocking(false);
+      open.connect(new InetSocketAddress(host, port));
+      finishConnect(open, new F() {
+        @Override
+        public void apply(SelectionKey key) throws Exception {
+          SSLEngine sslEngine = SSLContext.getDefault().createSSLEngine(host, port);
+          sslEngine.setUseClientMode(true);
+          sslEngine.setWantClientAuth(false);
+          FSM.sslState.put(key, sslEngine);
+          FSM.sslGoal.put(key, Pair.<Integer, Object>pair(clientOps, asioVisitor));
+          FSM.needWrap(pair(key, sslEngine));
+        }
+      });
+
+    }
+
+    public static ByteBuffer coalesceBuffers(List<ByteBuffer> byteBuffers) {
+      ByteBuffer[] byteBuffers1 = byteBuffers.toArray(new ByteBuffer[byteBuffers.size()]);
+      return coalesceBuffers(byteBuffers1);
+    }
+
+    /**
+     * some kind of less painful way to do byteBuffer operations and a few new ones thrown in.
+     * <p/>
+     * evidence that this can be shorter
+     * <pre>
+     *
+     * res.add(on(nextChunk, rewind));
+     * res.add((ByteBuffer) nextChunk.rewind());
+     *
+     *
+     * </pre>
+     */
     public interface Do {
-      <T extends ByteBuffer> T perform(ByteBuffer target);
+      <T extends ByteBuffer> T perform(T target);
 
       enum pre implements Do {
         duplicate {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.duplicate();
           }
         }, flip {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.flip();
           }
         }, slice {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.slice();
           }
         }, mark {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.mark();
           }
         }, reset {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.reset();
           }
         }, rewind {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.rewind();
           }
         },
@@ -260,41 +315,84 @@ public interface AsioVisitor {
          */
         debug {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
-            ByteBuffer on = on(target, duplicate, rewind);
-            System.err.println("%%: " + UTF_8.decode(on));
-            return (T) target;
+          public <T extends ByteBuffer> T perform(T target) {
+            System.err.println("%%: " + asString(target, duplicate, rewind));
+            return target;
           }
         }, ro {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.asReadOnlyBuffer();
           }
-        }, skipWs {
+        },
+
+        /**
+         * perfoms get until non-ws returned.  then backtracks.by one.
+         * <p/>
+         * <p/>
+         * resets position and throws BufferUnderFlow if runs out of space before success
+         */
+
+
+        forceSkipWs {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
+            int position = target.position();
+
             while (target.hasRemaining() && Character.isWhitespace(target.get()))
               ;
-            return (T) target;
+            if (!target.hasRemaining()) {
+              target.position(position);
+              throw new BufferUnderflowException();
+            }
+            return on(target, back1);
           }
-        }, toWs {
+        },
+        skipWs {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
+            int position = target.position();
+
+            while (target.hasRemaining() && Character.isWhitespace(target.get()))
+              ;
+
+            return on(target, back1);
+          }
+        },
+        toWs {
+          @Override
+          public <T extends ByteBuffer> T perform(T target) {
             while (target.hasRemaining() && !Character.isWhitespace(target.get()))
               ;
-            return (T) target;
+            return target;
           }
-        }, toEol {
+        },
+        /**
+         * @throws java.nio.BufferUnderflowException if EOL was not reached
+         */
+        forceToEol{
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
-            while (target.hasRemaining() && '\n' != (target.get()))
+          public <T extends ByteBuffer> T perform(T target) {
+            while (target.hasRemaining() && '\n' != target.get())
               ;
-            return (T) target;
+            if (!target.hasRemaining())
+              throw new BufferUnderflowException();
+            return target;
+          }
+        },
+        /**
+         * @throws java.nio.BufferUnderflowException if EOL was not reached
+         */
+        toEol {
+          @Override
+          public <T extends ByteBuffer> T perform(T target) {
+            while (target.hasRemaining() && '\n' != target.get());
+            return target;
           }
         },
         back1 {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             int position = target.position();
             return (T) (position > 0 ? target.position(position - 1) : target);
           }
@@ -304,25 +402,27 @@ public interface AsioVisitor {
          */
         back2 {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             int position = target.position();
             return (T) (position > 1 ? target.position(position - 2) : on(target, back1));
           }
-        }, /**reduces the position of target until the charatcter is non-white.
+        }, /**
+         * reduces the position of target until the character is non-white.
          */rtrim {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             int start = target.position(), i = start;
-            while (--i  >=  0 && Character.isWhitespace(target.get( i )));
+            while (--i >= 0 && Character.isWhitespace(target.get(i)))
+              ;
 
-           return (T) target.position(++i);
+            return (T) target.position(++i);
           }
         }, skipDigits {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             while (target.hasRemaining() && Character.isDigit(target.get()))
               ;
-            return (T) target;
+            return target;
           }
         }
       }
@@ -330,34 +430,34 @@ public interface AsioVisitor {
       enum post implements Do {
         compact {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.compact();
           }
         }, reset {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.reset();
           }
         }, rewind {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.rewind();
           }
         }, clear {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.clear();
           }
 
         }, grow {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) growBuffer(target);
           }
 
         }, ro {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             return (T) target.asReadOnlyBuffer();
           }
         },
@@ -367,11 +467,11 @@ public interface AsioVisitor {
 
         pad0 {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             while (target.hasRemaining()) {
               target.put((byte) 0);
             }
-            return (T) target;
+            return target;
           }
         },
         /**
@@ -380,7 +480,7 @@ public interface AsioVisitor {
 
         pad0Until {
           @Override
-          public <T extends ByteBuffer> T perform(ByteBuffer target) {
+          public <T extends ByteBuffer> T perform(T target) {
             int limit = target.limit();
             target.flip();
             while (target.hasRemaining()) {
@@ -392,12 +492,7 @@ public interface AsioVisitor {
       }
     }
 
-    public static ByteBuffer on(ByteBuffer b, Do... ops) {
-      for (Do op : ops) {
-        b = op.perform(b);
-      }
-      return b;
-    }
+    public static <T extends ByteBuffer> T on(T b, Do... ops) {for (int i = 0, opsLength = ops.length; i < opsLength; i++) {Do op = ops[i];b = op.<T>perform(b);}return b;}
 
     /**
      * convenience method
@@ -421,13 +516,22 @@ public interface AsioVisitor {
       return s;
     }
 
-    public static void toAccept(SelectionKey key, F f) {
-      toAccept(key, toAccept(f));
+    /**
+     * convenience method
+     *
+     * @param src
+     * @param operations
+     * @return
+     */
+    public static ByteBuffer asBuffer(String src, Do... operations) {
+
+      ByteBuffer byteBuffer = UTF_8.encode(src);
+      for (Do operation : operations) {
+        byteBuffer = operation.perform(byteBuffer);
+      }
+      return byteBuffer;
     }
 
-    public static void toAccept(SelectionKey key, Impl impl) {
-      toRead(key, impl);
-    }
 
     public static void toRead(SelectionKey key, F f) {
       key.interestOps(OP_READ).attach(toRead(f));
@@ -435,7 +539,8 @@ public interface AsioVisitor {
     }
 
     public static void toRead(SelectionKey key, Impl impl) {
-      key.interestOps(OP_ACCEPT).attach(impl);
+      //toRead
+      key.interestOps(OP_READ).attach(impl);
       key.selector().wakeup();
     }
 
@@ -443,32 +548,50 @@ public interface AsioVisitor {
       toConnect(key, toConnect(f));
     }
 
-    public static void toConnect(SelectionKey key, Impl impl) {
+    public static void toConnect(SelectionKey key, Impl impl) {//toConnect
       key.interestOps(OP_CONNECT).attach(impl);
       key.selector().wakeup();
     }
 
+    public static void finishConnect(String host, int port, F onSuccess) throws Exception {      //finishConnect
+
+      SocketChannel open = SocketChannel.open();
+      open.configureBlocking(false);
+      open.connect(new InetSocketAddress(host, port));
+      finishConnect(open, onSuccess);
+    }
+
+    public static void finishConnect(final SocketChannel channel, final F onSuccess) throws Exception {
+      //finishConnect
+      SingleThreadSingletonServer.enqueue(channel, OP_CONNECT,
+          toConnect(new F() {
+            @Override
+            public void apply(SelectionKey key) throws Exception {
+              if (channel.finishConnect()) {
+                onSuccess.apply(key);
+              }
+            }
+          }));
+    }
+
     public static void toWrite(SelectionKey key, F f) {
+      //toWrite
       toWrite(key, toWrite(f));
     }
 
     public static void toWrite(SelectionKey key, Impl impl) {
+      //toWrite
       key.interestOps(OP_WRITE).attach(impl);
       key.selector().wakeup();
     }
 
-    public static Impl toAccept(final F f) {
-      return new Impl() {
-        public void onAccept(SelectionKey key) throws Exception {
-          f.apply(key);
-        }
-      };
-    }
 
     public static Impl toRead(final F f) {
       return new Impl() {
         public void onRead(SelectionKey key) throws Exception {
+          //toRead begin
           f.apply(key);
+          //toRead end
         }
       };
     }
@@ -482,6 +605,7 @@ public interface AsioVisitor {
     }
 
     public static Impl toConnect(final F f) {
+      //toConnect
       return new Impl() {
         public void onConnect(SelectionKey key) throws Exception {
           f.apply(key);
@@ -499,7 +623,7 @@ public interface AsioVisitor {
 
     public static Impl finishRead(final ByteBuffer payload,
                                   final Runnable success) {
-
+      //finishRead
       return toRead(new F() {
         public void apply(SelectionKey key) throws Exception {
           if (payload.hasRemaining()) {
@@ -521,22 +645,22 @@ public interface AsioVisitor {
         success.run();
     }
 
-    public static ByteBuffer coalesceBuffers(ByteBuffer... payload) {
+    public static ByteBuffer coalesceBuffers(ByteBuffer... src) {
       ByteBuffer cursor;
       int total = 0;
-      if (1 < payload.length) {
-        for (int i = 0, payloadLength = payload.length; i < payloadLength; i++) {
-          ByteBuffer byteBuffer = payload[i];
+      if (1 < src.length) {
+        for (int i = 0, payloadLength = src.length; i < payloadLength; i++) {
+          ByteBuffer byteBuffer = src[i];
           total += byteBuffer.remaining();
         }
         cursor = ByteBuffer.allocateDirect(total);
-        for (int i = 0, payloadLength = payload.length; i < payloadLength; i++) {
-          ByteBuffer byteBuffer = payload[i];
+        for (int i = 0, payloadLength = src.length; i < payloadLength; i++) {
+          ByteBuffer byteBuffer = src[i];
           cursor.put(byteBuffer);
         }
         cursor.rewind();
       } else {
-        cursor = payload[0];
+        cursor = src[0];
       }
       return cursor;
     }
@@ -591,14 +715,14 @@ public interface AsioVisitor {
     }
 
     public static Impl finishWrite(final F success,
-                                   final ByteBuffer cursor) {
-
+                                   ByteBuffer... src1) {
+      final ByteBuffer src = coalesceBuffers(src1);
       return toWrite(new F() {
         public void apply(SelectionKey key) throws Exception {
-          int write = write(key, cursor);
+          int write = write(key, src);
           if (-1 == write)
             key.cancel();
-          if (!cursor.hasRemaining())
+          if (!src.hasRemaining())
             success.apply(key);
         }
       });
@@ -610,7 +734,7 @@ public interface AsioVisitor {
 
     public static void finishWrite(SelectionKey key, F onSuccess,
                                    ByteBuffer... payload) {
-      final ByteBuffer cursor = coalesceBuffers(payload);
+      ByteBuffer cursor = coalesceBuffers(payload);
       if (cursor.hasRemaining())
         toWrite(key, finishWrite(onSuccess, cursor));
       else
@@ -680,12 +804,13 @@ public interface AsioVisitor {
         read = ((SocketChannel) key.channel()).read(toApp);
         return read;
       }
-      final ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
+      ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
       read = ((SocketChannel) key.channel()).read(fromNet);
       ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
       ByteBuffer origin = toApp.duplicate();
-      SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), overflow);
-      cat((ByteBuffer) overflow.flip(), toApp);
+      SSLEngineResult unwrap = sslEngine.unwrap(on(fromNet, flip), overflow);
+      cat(on(overflow,flip), toApp);
+      if(overflow.hasRemaining())System.err.println("**!!!* sslBacklog.toApp retaining "+overflow.remaining()+" bytes");
       overflow.compact();
       fromNet.compact();
       System.err.println("read:unwrap: " + unwrap);
@@ -744,36 +869,11 @@ public interface AsioVisitor {
       return ByteBuffer.allocateDirect(src.capacity() << 1).put(src);
     }
 
-    /**
-     * preserves previous key state, then does a finish-read operation, blocks thread.
-     *
-     * @param key
-     * @param payload
-     * @throws InterruptedException
-     * @throws BrokenBarrierException
-     * @throws TimeoutException
-     */
-
-    public static void syncFill(SelectionKey key, ByteBuffer payload) throws InterruptedException, BrokenBarrierException, TimeoutException {
-      final CyclicBarrier finishChunk = new CyclicBarrier(2);
-      final int oldOps = key.interestOps();
-      final Object attachment = key.attachment();
-      F success = new F() {
-        @Override
-        public void apply(SelectionKey key) throws Exception {
-          key.interestOps(oldOps).attach(attachment);
-          key.selector().wakeup();
-          finishChunk.await();
-        }
-      };
-      finishRead(key, payload, success);
-      finishChunk.await(REALTIME_CUTOFF, REALTIME_UNIT);
-    }
-
+    /*
     public static void debugBuf(ByteBuffer nextChunk) {
-      on(nextChunk, pre.debug);
-    }
-
+          on(nextChunk, pre.debug);
+        }
+        */
     public interface F {
       void apply(SelectionKey key) throws Exception;
     }
