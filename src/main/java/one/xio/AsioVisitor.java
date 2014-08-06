@@ -28,6 +28,8 @@ import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static one.xio.AsioVisitor.Helper.Do.pre.flip;
+import static one.xio.AsioVisitor.Helper.REALTIME_CUTOFF;
+import static one.xio.AsioVisitor.Helper.REALTIME_UNIT;
 import static one.xio.AsioVisitor.Helper.on;
 import static one.xio.Pair.pair;
 
@@ -76,7 +78,7 @@ public interface AsioVisitor {
         runnables.add(new Callable<Void>() {
           public Void call() throws Exception {
             finalT1.run();
-            barrier.get().await(3, TimeUnit.MINUTES);
+            barrier.get().await(REALTIME_CUTOFF, REALTIME_UNIT);
             return null;
           }
         });
