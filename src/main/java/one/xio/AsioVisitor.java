@@ -94,7 +94,7 @@ public interface AsioVisitor {
         }
       }));
 
-      assert executorService != null : "must install FSM executorService!";
+      assert null != executorService : "must install FSM executorService!";
       executorService.invokeAll(runnables);
 
     }
@@ -372,7 +372,7 @@ public interface AsioVisitor {
         /**
          * @throws java.nio.BufferUnderflowException if EOL was not reached
          */
-        forceToEol{
+        forceToEol {
           @Override
           public <T extends ByteBuffer> T perform(T target) {
             while (target.hasRemaining() && '\n' != target.get())
@@ -388,7 +388,8 @@ public interface AsioVisitor {
         toEol {
           @Override
           public <T extends ByteBuffer> T perform(T target) {
-            while (target.hasRemaining() && '\n' != target.get());
+            while (target.hasRemaining() && '\n' != target.get())
+              ;
             return target;
           }
         },
@@ -396,7 +397,7 @@ public interface AsioVisitor {
           @Override
           public <T extends ByteBuffer> T perform(T target) {
             int position = target.position();
-            return (T) (position > 0 ? target.position(position - 1) : target);
+            return (T) (0 < position ? target.position(position - 1) : target);
           }
         },
         /**
@@ -406,7 +407,7 @@ public interface AsioVisitor {
           @Override
           public <T extends ByteBuffer> T perform(T target) {
             int position = target.position();
-            return (T) (position > 1 ? target.position(position - 2) : on(target, back1));
+            return (T) (1 < position ? target.position(position - 2) : on(target, back1));
           }
         }, /**
          * reduces the position of target until the character is non-white.
@@ -414,7 +415,7 @@ public interface AsioVisitor {
           @Override
           public <T extends ByteBuffer> T perform(T target) {
             int start = target.position(), i = start;
-            while (--i >= 0 && Character.isWhitespace(target.get(i)))
+            while (0 <= --i && Character.isWhitespace(target.get(i)))
               ;
 
             return (T) target.position(++i);
@@ -494,7 +495,13 @@ public interface AsioVisitor {
       }
     }
 
-    public static <T extends ByteBuffer> T on(T b, Do... ops) {for (int i = 0, opsLength = ops.length; i < opsLength; i++) {Do op = ops[i];b = op.<T>perform(b);}return b;}
+    public static <T extends ByteBuffer> T on(T b, Do... ops) {
+      for (int i = 0, opsLength = ops.length; i < opsLength; i++) {
+        Do op = ops[i];
+        b = op.<T>perform(b);
+      }
+      return b;
+    }
 
     /**
      * convenience method
@@ -535,9 +542,29 @@ public interface AsioVisitor {
     }
 
 
+    public static Impl toRead(final F f) {
+      return new Impl() {
+        public void onRead(SelectionKey key) throws Exception {
+          //toRead begin
+          f.apply(key);
+          //toRead end
+        }
+      };
+    }
+
     public static void toRead(SelectionKey key, F f) {
+      SSLEngine sslEngine = FSM.sslState.get(key);
       key.interestOps(OP_READ).attach(toRead(f));
-      key.selector().wakeup();
+
+      if (null != sslEngine && sslBacklog.toApp.resume(pair(key, sslEngine)).hasRemaining())
+        try {
+          f.apply(key);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      else
+        key.selector().wakeup();
+
     }
 
     public static void toRead(SelectionKey key, Impl impl) {
@@ -587,16 +614,6 @@ public interface AsioVisitor {
       key.selector().wakeup();
     }
 
-
-    public static Impl toRead(final F f) {
-      return new Impl() {
-        public void onRead(SelectionKey key) throws Exception {
-          //toRead begin
-          f.apply(key);
-          //toRead end
-        }
-      };
-    }
 
     public static Impl toWrite(final F f) {
       return new Impl() {
@@ -811,8 +828,9 @@ public interface AsioVisitor {
       ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
       ByteBuffer origin = toApp.duplicate();
       SSLEngineResult unwrap = sslEngine.unwrap(on(fromNet, flip), overflow);
-      cat(on(overflow,flip), toApp);
-      if(overflow.hasRemaining())System.err.println("**!!!* sslBacklog.toApp retaining "+overflow.remaining()+" bytes");
+      cat(on(overflow, flip), toApp);
+      if (overflow.hasRemaining())
+        System.err.println("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
       overflow.compact();
       fromNet.compact();
       System.err.println("read:unwrap: " + unwrap);
