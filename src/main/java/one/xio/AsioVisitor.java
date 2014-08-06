@@ -555,7 +555,6 @@ public interface AsioVisitor {
     public static void toRead(SelectionKey key, F f) {
       SSLEngine sslEngine = FSM.sslState.get(key);
       key.interestOps(OP_READ).attach(toRead(f));
-
       if (null != sslEngine && sslBacklog.toApp.resume(pair(key, sslEngine)).hasRemaining())
         try {
           f.apply(key);
