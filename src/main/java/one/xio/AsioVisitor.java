@@ -1,8 +1,6 @@
 package one.xio;
 
 import one.xio.AsioVisitor.FSM.sslBacklog;
-import one.xio.AsioVisitor.Helper.Do.post;
-import one.xio.AsioVisitor.Helper.Do.pre;
 import one.xio.AsyncSingletonServer.SingleThreadSingletonServer;
 
 import javax.net.ssl.SSLContext;
@@ -11,7 +9,6 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import java.net.InetSocketAddress;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.ArrayList;
@@ -24,13 +21,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static bbcursive.Cursive.pre.flip;
+import static bbcursive.Cursive.std.bb;
+import static bbcursive.Cursive.std.cat;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static one.xio.AsioVisitor.Helper.Do.pre.flip;
 import static one.xio.AsioVisitor.Helper.REALTIME_CUTOFF;
 import static one.xio.AsioVisitor.Helper.REALTIME_UNIT;
-import static one.xio.AsioVisitor.Helper.on;
 import static one.xio.Pair.pair;
 
 /**
@@ -181,7 +179,7 @@ public interface AsioVisitor {
       ByteBuffer fromApp = sslBacklog.fromApp.resume(state);
 
       SSLEngine sslEngine = state.getB();
-      SSLEngineResult wrap = sslEngine.wrap(on(fromApp, flip), toNet);
+      SSLEngineResult wrap = sslEngine.wrap(bb(fromApp, flip), toNet);
       System.err.println("wrap: " + wrap);
       switch (wrap.getStatus()) {
         case BUFFER_UNDERFLOW:
@@ -263,282 +261,6 @@ public interface AsioVisitor {
     public static ByteBuffer coalesceBuffers(List<ByteBuffer> byteBuffers) {
       ByteBuffer[] byteBuffers1 = byteBuffers.toArray(new ByteBuffer[byteBuffers.size()]);
       return coalesceBuffers(byteBuffers1);
-    }
-
-    /**
-     * some kind of less painful way to do byteBuffer operations and a few new ones thrown in.
-     * <p/>
-     * evidence that this can be shorter
-     * <pre>
-     *
-     * res.add(on(nextChunk, rewind));
-     * res.add((ByteBuffer) nextChunk.rewind());
-     *
-     *
-     * </pre>
-     */
-    public interface Do {
-      <T extends ByteBuffer> T perform(T target);
-
-      enum pre implements Do {
-        duplicate {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.duplicate();
-          }
-        }, flip {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.flip();
-          }
-        }, slice {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.slice();
-          }
-        }, mark {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.mark();
-          }
-        }, reset {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.reset();
-          }
-        }, rewind {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.rewind();
-          }
-        },
-        /**
-         * rewinds, dumps to console but returns unchanged buffer
-         */
-        debug {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            System.err.println("%%: " + asString(target, duplicate, rewind));
-            return target;
-          }
-        }, ro {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.asReadOnlyBuffer();
-          }
-        },
-
-        /**
-         * perfoms get until non-ws returned.  then backtracks.by one.
-         * <p/>
-         * <p/>
-         * resets position and throws BufferUnderFlow if runs out of space before success
-         */
-
-
-        forceSkipWs {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            int position = target.position();
-
-            while (target.hasRemaining() && Character.isWhitespace(target.get()))
-              ;
-            if (!target.hasRemaining()) {
-              target.position(position);
-              throw new BufferUnderflowException();
-            }
-            return on(target, back1);
-          }
-        },
-        skipWs {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            int position = target.position();
-
-            while (target.hasRemaining() && Character.isWhitespace(target.get()))
-              ;
-
-            return on(target, back1);
-          }
-        },
-        toWs {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            while (target.hasRemaining() && !Character.isWhitespace(target.get()))
-              ;
-            return target;
-          }
-        },
-        /**
-         * @throws java.nio.BufferUnderflowException if EOL was not reached
-         */
-        forceToEol {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            while (target.hasRemaining() && '\n' != target.get())
-              ;
-            if (!target.hasRemaining())
-              throw new BufferUnderflowException();
-            return target;
-          }
-        },
-        /**
-         * @throws java.nio.BufferUnderflowException if EOL was not reached
-         */
-        toEol {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            while (target.hasRemaining() && '\n' != target.get())
-              ;
-            return target;
-          }
-        },
-        back1 {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            int position = target.position();
-            return (T) (0 < position ? target.position(position - 1) : target);
-          }
-        },
-        /**
-         * reverses position _up to_ 2.
-         */
-        back2 {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            int position = target.position();
-            return (T) (1 < position ? target.position(position - 2) : on(target, back1));
-          }
-        }, /**
-         * reduces the position of target until the character is non-white.
-         */rtrim {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            int start = target.position(), i = start;
-            while (0 <= --i && Character.isWhitespace(target.get(i)))
-              ;
-
-            return (T) target.position(++i);
-          }
-        }, skipDigits {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            while (target.hasRemaining() && Character.isDigit(target.get()))
-              ;
-            return target;
-          }
-        }
-      }
-
-      enum post implements Do {
-        compact {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.compact();
-          }
-        }, reset {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.reset();
-          }
-        }, rewind {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.rewind();
-          }
-        }, clear {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.clear();
-          }
-
-        }, grow {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) growBuffer(target);
-          }
-
-        }, ro {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            return (T) target.asReadOnlyBuffer();
-          }
-        },
-        /**
-         * fills remainder of buffer to 0's
-         */
-
-        pad0 {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            while (target.hasRemaining()) {
-              target.put((byte) 0);
-            }
-            return target;
-          }
-        },
-        /**
-         * fills prior bytes to current position with 0's
-         */
-
-        pad0Until {
-          @Override
-          public <T extends ByteBuffer> T perform(T target) {
-            int limit = target.limit();
-            target.flip();
-            while (target.hasRemaining()) {
-              target.put((byte) 0);
-            }
-            return (T) target.limit(limit);
-          }
-        }
-      }
-    }
-
-    public static <T extends ByteBuffer> T on(T b, Do... ops) {
-      for (int i = 0, opsLength = ops.length; i < opsLength; i++) {
-        Do op = ops[i];
-        b = op.<T>perform(b);
-      }
-      return b;
-    }
-
-    /**
-     * convenience method
-     *
-     * @param bytes
-     * @param operations
-     * @return
-     */
-    public static String asString(ByteBuffer bytes, Do... operations) {
-      for (Do operation : operations) {
-        if (operation instanceof pre) {
-          bytes = operation.perform(bytes);
-        }
-      }
-      String s = UTF_8.decode(bytes).toString();
-      for (Do operation : operations) {
-        if (operation instanceof post) {
-          bytes = operation.perform(bytes);
-        }
-      }
-      return s;
-    }
-
-    /**
-     * convenience method
-     *
-     * @param src
-     * @param operations
-     * @return
-     */
-    public static ByteBuffer asBuffer(String src, Do... operations) {
-
-      ByteBuffer byteBuffer = UTF_8.encode(src);
-      for (Do operation : operations) {
-        byteBuffer = operation.perform(byteBuffer);
-      }
-      return byteBuffer;
     }
 
 
@@ -826,8 +548,8 @@ public interface AsioVisitor {
       read = ((SocketChannel) key.channel()).read(fromNet);
       ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
       ByteBuffer origin = toApp.duplicate();
-      SSLEngineResult unwrap = sslEngine.unwrap(on(fromNet, flip), overflow);
-      cat(on(overflow, flip), toApp);
+      SSLEngineResult unwrap = sslEngine.unwrap(bb(fromNet, flip), overflow);
+      cat(bb(overflow, flip), toApp);
       if (overflow.hasRemaining())
         System.err.println("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
       overflow.compact();
@@ -871,21 +593,6 @@ public interface AsioVisitor {
     public static void sslPush(SelectionKey key, SSLEngine engine) throws Exception {
       FSM.sslGoal.put(key, pair(key.interestOps(), key.attachment()));
       FSM.handShake(pair(key, engine));
-    }
-
-    public static ByteBuffer cat(ByteBuffer src, ByteBuffer dest) {
-      int need = src
-          .remaining(),
-          have = dest.remaining();
-      if (have > need) return dest.put(src);
-      dest.put((ByteBuffer) src.slice().limit(have));
-      src.position(src.position() + have);
-      return dest;
-
-    }
-
-    public static ByteBuffer growBuffer(ByteBuffer src) {
-      return ByteBuffer.allocateDirect(src.capacity() << 1).put(src);
     }
 
     /*

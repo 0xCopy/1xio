@@ -7,6 +7,14 @@
     <groupId>1xio</groupId>
     <artifactId>1xio</artifactId>
     <version>2.0.1</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>bbcursive</groupId>
+            <artifactId>bbcursive</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>
@@ -15,11 +23,13 @@
                 <version>2.4</version>
                 <configuration>
                     <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                        <descriptorRef>jar-with-dependencies
+                        </descriptorRef>
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>one.xio.HttpMethod</mainClass>
+                            <mainClass>one.xio.HttpMethod
+                            </mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -37,8 +47,11 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>com.googlecode.maven-java-formatter-plugin</groupId>
-                <artifactId>maven-java-formatter-plugin</artifactId>
+                <groupId>
+                    com.googlecode.maven-java-formatter-plugin
+                </groupId>
+                <artifactId>maven-java-formatter-plugin
+                </artifactId>
                 <version>0.3.1</version>
                 <executions>
                     <execution>
