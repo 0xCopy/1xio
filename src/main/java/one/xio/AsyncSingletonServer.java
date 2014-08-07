@@ -55,7 +55,7 @@ public interface AsyncSingletonServer {
       FSM.selectorThread = Thread.currentThread();
 
       long timeoutMax = 1024, timeout = 1;
-
+      synchronized (killswitch){
       while (!killswitch.get()) {
         while (!q.isEmpty()) {
           Object[] s = q.remove();
@@ -78,7 +78,7 @@ public interface AsyncSingletonServer {
         if (0 != select)
           innerloop(protocoldecoder);
       }
-    }
+    }}
 
     public static void innerloop(AsioVisitor protocoldecoder) throws IOException {
       Set<SelectionKey> keys = FSM.selector.selectedKeys();
