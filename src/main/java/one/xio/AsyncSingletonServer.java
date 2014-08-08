@@ -55,7 +55,7 @@ public interface AsyncSingletonServer {
       FSM.selectorThread = Thread.currentThread();
 
       long timeoutMax = 1024, timeout = 1;
-      synchronized (killswitch){
+      /*synchronized (killswitch)*/{
       while (!killswitch.get()) {
         while (!q.isEmpty()) {
           Object[] s = q.remove();
