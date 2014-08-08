@@ -8,6 +8,7 @@ import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
@@ -22,8 +23,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static bbcursive.Cursive.pre.flip;
-import static bbcursive.Cursive.std.bb;
-import static bbcursive.Cursive.std.cat;
+import static bbcursive.std.bb;
+import static bbcursive.std.cat;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -595,13 +596,95 @@ public interface AsioVisitor {
       FSM.handShake(pair(key, engine));
     }
 
-
-
-    /*
-    public static void debugBuf(ByteBuffer nextChunk) {
-          on(nextChunk, pre.debug);
+    /**
+     * like finishWrite however does not coalesce buffers together
+     *
+     * @param key
+     * @param success
+     * @param payload
+     */
+    public static void finishWriteSeq(SelectionKey key, final Runnable success, final ByteBuffer... payload) {
+      finishWriteSeq(key, new F() {
+        @Override
+        public void apply(SelectionKey key) throws Exception {
+          success.run();
         }
-        */
+      }, payload);
+    }
+
+    /**
+     * like finishWrite however does not coalesce buffers together
+     *
+     * @param key
+     * @param success
+     * @param payload
+     */
+    public static void finishWriteSeq(final SelectionKey key, final F success, final ByteBuffer... payload) {
+      key.interestOps(OP_WRITE).attach(toWrite(new F() {
+        public int c;
+
+        public void apply(SelectionKey key1) throws Exception {
+          for (; ; ) {
+            final ByteBuffer cursor = payload[c];
+            int write = write(key1, cursor);
+            if (-1 == write) {
+              key1.cancel();
+              return;
+            }
+            if (cursor.hasRemaining()) return;
+            payload[c] = null;
+            c++;
+            if (payload.length == c) {
+              success.apply(key);
+              return;
+            }
+          }
+        }
+      }));
+      key.selector().wakeup();
+    }
+
+    public static void toConnect(InetSocketAddress socketAddress, F f) throws IOException {
+      SocketChannel open = SocketChannel.open();
+      open.configureBlocking(false);
+      open.connect(socketAddress);
+      SelectionKey register = open.register(getSelector(), OP_CONNECT);
+      toConnect(register, f);
+
+    }
+
+    /**
+     * makes a key/channel go buh-bye.
+     */
+    public static void bye(SelectionKey key) {
+      try {
+        try {
+          key.cancel();
+        } catch (Exception e) {
+
+        }
+        key.channel().close();
+      } catch (IOException e) {
+
+      }
+    }
+    public static void park(SelectionKey key, final F then) throws Exception {
+      key.interestOps(0);
+      then.apply(key);
+    }
+
+    public static <T extends F>T park(SelectionKey key, final F... then) throws Exception {
+      return (T) new F() {
+        @Override
+        public void apply(SelectionKey key) throws Exception {
+          key.interestOps(0);
+          if (then.length > 0) {
+              then[0].apply(key);
+          }
+        }
+      };
+    }
+
     public interface F {
       void apply(SelectionKey key) throws Exception;
     }
