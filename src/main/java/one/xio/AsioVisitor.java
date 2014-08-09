@@ -369,11 +369,13 @@ public interface AsioVisitor {
         public void apply(SelectionKey key) throws Exception {
           if (payload.hasRemaining()) {
             int read = read(key, payload);
-            if (-1 == read)
+            if (-1 == read) {
               key.cancel();
+            }
           }
-          if (!payload.hasRemaining())
+          if (!payload.hasRemaining()) {
             success.run();//warning, will not remove READ_OP from interest.  you are responsible for steering the outcome
+          }
         }
       });
     }
@@ -446,12 +448,14 @@ public interface AsioVisitor {
 
     public static void finishRead(SelectionKey key, ByteBuffer payload,
                                   F success) {
-      if (payload.hasRemaining())
+      if (!payload.hasRemaining()) {
+        try {
+          success.apply(key);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      } else {
         toRead(key, finishRead(payload, success));
-      else try {
-        success.apply(key);
-      } catch (Exception e) {
-        e.printStackTrace();
       }
     }
 
@@ -673,7 +677,7 @@ public interface AsioVisitor {
       then.apply(key);
     }
 
-    public static <T extends F>T park(SelectionKey key, final F... then) throws Exception {
+    public static <T extends F>T park(final F... then) throws Exception {
       return (T) new F() {
         @Override
         public void apply(SelectionKey key) throws Exception {
