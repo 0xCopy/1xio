@@ -666,13 +666,16 @@ public interface AsioVisitor {
       };
     }
 
-    public static F terminate(final F... then) {
+        public static F terminate(final F... then) {
       return new F() {
         @Override
         public void apply(SelectionKey deadKeyWalking)
             throws Exception {
           bye(deadKeyWalking);
-          if (then.length > 0) then[0].apply(deadKeyWalking);
+          if (then.length > 0) {
+            F f = then[0];
+            f.apply(deadKeyWalking);
+          }
         }
       };
     }
