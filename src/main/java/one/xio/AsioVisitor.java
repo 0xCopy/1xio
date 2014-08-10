@@ -95,8 +95,8 @@ public interface AsioVisitor {
         }
       }));
 
-      assert null != executorService : "must install FSM executorService!";
-      executorService.invokeAll(runnables);
+      assert null != getExecutorService() : "must install FSM executorService!";
+      getExecutorService().invokeAll(runnables);
 
     }
 
@@ -200,6 +200,10 @@ public interface AsioVisitor {
           state.getA().cancel();
       }
 
+    }
+
+    public static ExecutorService getExecutorService() {
+      return executorService;
     }
 
     enum sslBacklog {
@@ -685,6 +689,27 @@ public interface AsioVisitor {
             F f = then[0];
             f.apply(deadKeyWalking);
           }
+        }
+      };
+    }
+
+    /**
+     * barriers and locks sometimes want thier own thread.
+     * @param onSuccess
+     * @return
+     */
+    public static F isolate(final F onSuccess) {
+      return new F() {
+        @Override
+        public void apply(final SelectionKey key) throws Exception {
+          FSM.getExecutorService().submit(new Callable<Void>() {
+            @Override
+            public Void call() throws Exception {
+              onSuccess.apply(key);
+
+              return null;
+            }
+          });
         }
       };
     }
