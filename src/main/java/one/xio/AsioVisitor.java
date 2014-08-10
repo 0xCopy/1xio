@@ -1,5 +1,6 @@
 package one.xio;
 
+import bbcursive.std;
 import one.xio.AsioVisitor.FSM.sslBacklog;
 import one.xio.AsyncSingletonServer.SingleThreadSingletonServer;
 
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static bbcursive.Cursive.pre.flip;
 import static bbcursive.std.bb;
-import static bbcursive.std.cat;
+import static bbcursive.std.push;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -259,10 +260,6 @@ public interface AsioVisitor {
 
     }
 
-    public static ByteBuffer coalesceBuffers(List<ByteBuffer> byteBuffers) {
-      ByteBuffer[] byteBuffers1 = byteBuffers.toArray(new ByteBuffer[byteBuffers.size()]);
-      return coalesceBuffers(byteBuffers1);
-    }
 
 
     public static Impl toRead(final F f) {
@@ -388,29 +385,9 @@ public interface AsioVisitor {
         success.run();
     }
 
-    public static ByteBuffer coalesceBuffers(ByteBuffer... src) {
-      ByteBuffer cursor;
-      int total = 0;
-      if (1 < src.length) {
-        for (int i = 0, payloadLength = src.length; i < payloadLength; i++) {
-          ByteBuffer byteBuffer = src[i];
-          total += byteBuffer.remaining();
-        }
-        cursor = ByteBuffer.allocateDirect(total);
-        for (int i = 0, payloadLength = src.length; i < payloadLength; i++) {
-          ByteBuffer byteBuffer = src[i];
-          cursor.put(byteBuffer);
-        }
-        cursor.rewind();
-      } else {
-        cursor = src[0];
-      }
-      return cursor;
-    }
-
     public static Impl finishWrite(final Runnable success,
                                    ByteBuffer... payload) {
-      final ByteBuffer cursor = coalesceBuffers(payload);
+      final ByteBuffer cursor = std.cat(payload);
 
       return toWrite(new F() {
         public void apply(SelectionKey key) throws Exception {
@@ -461,7 +438,7 @@ public interface AsioVisitor {
 
     public static Impl finishWrite(final F success,
                                    ByteBuffer... src1) {
-      final ByteBuffer src = coalesceBuffers(src1);
+      final ByteBuffer src = std.cat(src1);
       return toWrite(new F() {
         public void apply(SelectionKey key) throws Exception {
           int write = write(key, src);
@@ -479,7 +456,7 @@ public interface AsioVisitor {
 
     public static void finishWrite(SelectionKey key, F onSuccess,
                                    ByteBuffer... payload) {
-      ByteBuffer cursor = coalesceBuffers(payload);
+      ByteBuffer cursor = std.cat(payload);
       if (cursor.hasRemaining())
         toWrite(key, finishWrite(onSuccess, cursor));
       else
@@ -508,7 +485,7 @@ public interface AsioVisitor {
       ByteBuffer toNet = sslBacklog.toNet.resume(pair(key, sslEngine));
       ByteBuffer fromApp = sslBacklog.fromApp.resume(pair(key, sslEngine));
       ByteBuffer origin = src.duplicate();
-      cat(src, fromApp);
+      push(src, fromApp);
       SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
       fromApp.compact();
       System.err.println("write:wrap: " + wrap);
@@ -554,7 +531,7 @@ public interface AsioVisitor {
       ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
       ByteBuffer origin = toApp.duplicate();
       SSLEngineResult unwrap = sslEngine.unwrap(bb(fromNet, flip), overflow);
-      cat(bb(overflow, flip), toApp);
+      push(bb(overflow, flip), toApp);
       if (overflow.hasRemaining())
         System.err.println("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
       overflow.compact();
