@@ -11,6 +11,7 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.ArrayList;
@@ -257,6 +258,14 @@ public interface AsioVisitor {
           FSM.needWrap(pair(key, sslEngine));
         }
       });
+
+    }
+
+    public static void sslClient(URI uri, Impl asioVisitor, int clientOps) throws Exception {
+      int port = uri.getPort();
+      if(port==-1)port=443;
+      String host = uri.getHost();
+      sslClient(host, port, asioVisitor, clientOps);
 
     }
 
