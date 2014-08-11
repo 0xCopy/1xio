@@ -25,8 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static bbcursive.Cursive.pre.flip;
-import static bbcursive.std.bb;
-import static bbcursive.std.push;
+import static bbcursive.std.*;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -653,12 +652,25 @@ public interface AsioVisitor {
     public static void bye(SelectionKey key) {
       try {
         try {
+          SSLEngine sslEngine = FSM.sslState.get(key);
+          if(null!= sslEngine){
+            log(sslEngine.isInboundDone(),"sslEngine.isInboundDone()");
+            log(sslEngine.isOutboundDone(),"sslEngine.isOutboundDone()");
+            Pair<SelectionKey, SSLEngine> pair = pair(key, sslEngine);
+            log(sslBacklog.toApp.resume(pair).toString(), "sslBacklog.toApp");
+            log(sslBacklog.fromNet.resume(pair).toString(), "sslBacklog.fromNet");
+            log(sslBacklog.toNet.resume(pair).toString(), "sslBacklog.toNet");
+            log(sslBacklog.fromApp.resume(pair).toString(),"sslBacklog.fromApp");
+            sslEngine.closeInbound();
+            sslEngine.closeOutbound();
+//            FSM.needWrap(pair( key, sslEngine));
+          }
           key.cancel();
-        } catch (Exception e) {
+        } catch (Throwable e) {
 
         }
         key.channel().close();
-      } catch (IOException e) {
+      } catch (Throwable e) {
 
       }
     }
