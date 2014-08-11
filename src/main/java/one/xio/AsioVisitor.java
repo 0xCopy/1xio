@@ -249,10 +249,12 @@ public interface AsioVisitor {
     public static void sslClient(final String host, final int port, final Impl asioVisitor, final int clientOps) throws Exception {
       SocketChannel open = SocketChannel.open();
       open.configureBlocking(false);
-      open.connect(new InetSocketAddress(host, port));
+      final InetSocketAddress remote = new InetSocketAddress(host, port);
+      open.connect(remote);
       finishConnect(open, new F() {
         @Override
         public void apply(SelectionKey key) throws Exception {
+          log(key, "ssl", remote.toString());
           SSLEngine sslEngine = SSLContext.getDefault().createSSLEngine(host, port);
           sslEngine.setUseClientMode(true);
           sslEngine.setWantClientAuth(false);
@@ -265,13 +267,13 @@ public interface AsioVisitor {
     }
 
     public static void sslClient(URI uri, Impl asioVisitor, int clientOps) throws Exception {
+      log(uri, "sslClient");
       int port = uri.getPort();
-      if(port==-1)port=443;
+      if (port == -1) port = 443;
       String host = uri.getHost();
       sslClient(host, port, asioVisitor, clientOps);
 
     }
-
 
 
     public static Impl toRead(final F f) {
@@ -285,15 +287,16 @@ public interface AsioVisitor {
     }
 
     public static void toRead(SelectionKey key, F f) {
+      log(key,"toRead",f.toString());
       SSLEngine sslEngine = FSM.sslState.get(key);
       key.interestOps(OP_READ).attach(toRead(f));
-      if (null != sslEngine && sslBacklog.toApp.resume(pair(key, sslEngine)).hasRemaining())
+      if (null != sslEngine && sslBacklog.toApp.resume(pair(key, sslEngine)).hasRemaining()) {
         try {
           f.apply(key);
         } catch (Exception e) {
           e.printStackTrace();
         }
-      else
+      } else
         key.selector().wakeup();
 
     }
@@ -309,6 +312,7 @@ public interface AsioVisitor {
     }
 
     public static void toConnect(SelectionKey key, Impl impl) {//toConnect
+      log (key,"toConnect",impl.toString());
       key.interestOps(OP_CONNECT).attach(impl);
       key.selector().wakeup();
     }
@@ -437,6 +441,7 @@ public interface AsioVisitor {
 
     public static void finishRead(SelectionKey key, ByteBuffer payload,
                                   F success) {
+      log(key, "finishRead");
       if (!payload.hasRemaining()) {
         try {
           success.apply(key);
@@ -450,6 +455,7 @@ public interface AsioVisitor {
 
     public static Impl finishWrite(final F success,
                                    ByteBuffer... src1) {
+      log(success, "finishWrite");
       final ByteBuffer src = std.cat(src1);
       return toWrite(new F() {
         public void apply(SelectionKey key) throws Exception {
@@ -468,6 +474,7 @@ public interface AsioVisitor {
 
     public static void finishWrite(SelectionKey key, F onSuccess,
                                    ByteBuffer... payload) {
+      log(onSuccess, "finishWrite-pre");
       ByteBuffer cursor = std.cat(payload);
       if (cursor.hasRemaining())
         toWrite(key, finishWrite(onSuccess, cursor));
@@ -500,7 +507,7 @@ public interface AsioVisitor {
       push(src, fromApp);
       SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
       fromApp.compact();
-      System.err.println("write:wrap: " + wrap);
+      log("write:wrap: " + wrap);
 
 
       switch (wrap.getHandshakeStatus()) {
@@ -513,7 +520,6 @@ public interface AsioVisitor {
               SocketChannel channel = (SocketChannel) key.channel();
               int ignored = channel.write((ByteBuffer) toNet.flip());
               toNet.compact();
-
               int i = src.position() - origin.position();
               return i;
             case CLOSED:
@@ -527,7 +533,6 @@ public interface AsioVisitor {
           sslPush(key, sslEngine);
           break;
       }
-
       return 0;
     }
 
@@ -545,10 +550,10 @@ public interface AsioVisitor {
       SSLEngineResult unwrap = sslEngine.unwrap(bb(fromNet, flip), overflow);
       push(bb(overflow, flip), toApp);
       if (overflow.hasRemaining())
-        System.err.println("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
+        log("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
       overflow.compact();
       fromNet.compact();
-      System.err.println("read:unwrap: " + unwrap);
+      log("read:unwrap: " + unwrap);
       Status status = unwrap.getStatus();
       switch (unwrap.getHandshakeStatus()) {
         case NOT_HANDSHAKING:
@@ -585,6 +590,7 @@ public interface AsioVisitor {
     }
 
     public static void sslPush(SelectionKey key, SSLEngine engine) throws Exception {
+      log(key, "sslPush");
       FSM.sslGoal.put(key, pair(key.interestOps(), key.attachment()));
       FSM.handShake(pair(key, engine));
     }
@@ -613,6 +619,7 @@ public interface AsioVisitor {
      * @param payload
      */
     public static void finishWriteSeq(final SelectionKey key, final F success, final ByteBuffer... payload) {
+      log(key, "finishWriteSeq");
       key.interestOps(OP_WRITE).attach(toWrite(new F() {
         public int c;
 
@@ -650,21 +657,21 @@ public interface AsioVisitor {
      * makes a key/channel go buh-bye.
      */
     public static void bye(SelectionKey key) {
-      try {
+log(key,"bye");      try {
         try {
-          SSLEngine sslEngine = FSM.sslState.get(key);
-          if(null!= sslEngine){
-            log(sslEngine.isInboundDone(),"sslEngine.isInboundDone()");
-            log(sslEngine.isOutboundDone(),"sslEngine.isOutboundDone()");
-            Pair<SelectionKey, SSLEngine> pair = pair(key, sslEngine);
-            log(sslBacklog.toApp.resume(pair).toString(), "sslBacklog.toApp");
-            log(sslBacklog.fromNet.resume(pair).toString(), "sslBacklog.fromNet");
-            log(sslBacklog.toNet.resume(pair).toString(), "sslBacklog.toNet");
-            log(sslBacklog.fromApp.resume(pair).toString(),"sslBacklog.fromApp");
-            sslEngine.closeInbound();
-            sslEngine.closeOutbound();
-//            FSM.needWrap(pair( key, sslEngine));
-          }
+//          SSLEngine sslEngine = FSM.sslState.get(key);
+//          if (null != sslEngine) {
+////            log(sslEngine.isInboundDone(), "sslEngine.isInboundDone()");
+////            log(sslEngine.isOutboundDone(), "sslEngine.isOutboundDone()");
+////            Pair<SelectionKey, SSLEngine> pair = pair(key, sslEngine);
+////            log(sslBacklog.toApp.resume(pair).toString(), "sslBacklog.toApp");
+////            log(sslBacklog.fromNet.resume(pair).toString(), "sslBacklog.fromNet");
+////            log(sslBacklog.toNet.resume(pair).toString(), "sslBacklog.toNet");
+////            log(sslBacklog.fromApp.resume(pair).toString(), "sslBacklog.fromApp");
+////            sslEngine.closeInbound();
+////            sslEngine.closeOutbound();
+////            FSM.needWrap(pair( key, sslEngine));
+//          }
           key.cancel();
         } catch (Throwable e) {
 
@@ -674,28 +681,31 @@ public interface AsioVisitor {
 
       }
     }
+
     public static void park(SelectionKey key, final F then) throws Exception {
       key.interestOps(0);
       then.apply(key);
     }
 
-    public static <T extends F>T park(final F... then) throws Exception {
+    public static <T extends F> T park(final F... then) throws Exception {
       return (T) new F() {
         @Override
         public void apply(SelectionKey key) throws Exception {
           key.interestOps(0);
           if (then.length > 0) {
-              then[0].apply(key);
+            then[0].apply(key);
           }
         }
       };
     }
 
-        public static F terminate(final F... then) {
+    public static F terminate(final F... then) {
+      log(then.length>0?then[0]:"-","terminate");
       return new F() {
         @Override
         public void apply(SelectionKey deadKeyWalking)
             throws Exception {
+
           bye(deadKeyWalking);
           if (then.length > 0) {
             F f = then[0];
@@ -707,6 +717,7 @@ public interface AsioVisitor {
 
     /**
      * barriers and locks sometimes want thier own thread.
+     *
      * @param onSuccess
      * @return
      */
