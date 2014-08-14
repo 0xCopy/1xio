@@ -1,37 +1,22 @@
 package one.xio;
 
 import bbcursive.std;
-import one.xio.AsioVisitor.FSM.sslBacklog;
 import one.xio.AsyncSingletonServer.SingleThreadSingletonServer;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLEngineResult.HandshakeStatus;
-import javax.net.ssl.SSLEngineResult.Status;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
-import static bbcursive.Cursive.pre.flip;
-import static bbcursive.std.*;
+import static bbcursive.std.log;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static one.xio.AsioVisitor.Helper.REALTIME_CUTOFF;
-import static one.xio.AsioVisitor.Helper.REALTIME_UNIT;
-import static one.xio.Pair.pair;
 
 /**
  * User: jim
@@ -51,22 +36,65 @@ public interface AsioVisitor {
   void onWrite(SelectionKey key) throws Exception;
 
   void onAccept(SelectionKey key) throws Exception;
+  class SSLKey extends SelectionKey{
+    @Override
+    public SelectableChannel channel() {
+      return null;
+    }
+
+    @Override
+    public Selector selector() {
+      return null;
+    }
+
+    @Override
+    public boolean isValid() {
+      return false;
+    }
+
+    @Override
+    public void cancel() {
+
+    }
+
+    @Override
+    public int interestOps() {
+      return 0;
+    }
+
+    @Override
+    public SelectionKey interestOps(int ops) {
+      return null;
+    }
+
+    @Override
+    public int readyOps() {
+      return 0;
+    }
+  }
 
   class FSM {
     public static final boolean DEBUG_SENDJSON = Config.get("DEBUG_SENDJSON", "false").equals(
         "true");
     public static Thread selectorThread;
     public static Selector selector;
-    public static Map<SelectionKey, SSLEngine> sslState = new WeakHashMap<>();
+//    public static Map<SelectionKey, SSLEngine> sslState = new WeakHashMap<>();
     /**
      * stores {InterestOps,{attachment}}
      */
     public static Map<SelectionKey, Pair<Integer, Object>> sslGoal = new WeakHashMap<>();
     private static ExecutorService executorService;
 
-    /**
+
+    public static void setExecutorService(ExecutorService svc) {
+      executorService = svc;
+    }
+/*
+    */
+/**
      * handles SslEngine state NEED_TASK.creates a phaser and launches all threads with invokeAll
-     */
+     *//*
+
     public static void delegateTasks(final Pair<SelectionKey, SSLEngine> state) throws InterruptedException {
       SelectionKey key = state.getA();
       List<Callable<Void>> runnables = new ArrayList<>();
@@ -99,13 +127,11 @@ public interface AsioVisitor {
 
     }
 
-    public static void setExecutorService(ExecutorService svc) {
-      executorService = svc;
-    }
-
-    /**
+    */
+/**
      * this is a beast.
-     */
+     *//*
+
     public static void handShake(Pair<SelectionKey, SSLEngine> state) throws Exception {
       if (!state.getA().isValid()) return;
       SSLEngine sslEngine = state.getB();
@@ -200,20 +226,21 @@ public interface AsioVisitor {
       }
 
     }
+*/
 
     public static ExecutorService getExecutorService() {
       return executorService;
     }
-
+/*public
     enum sslBacklog {
       fromNet, toNet, fromApp, toApp;
       public Map<SelectionKey, ByteBuffer> per = new WeakHashMap<>();
 
-      public ByteBuffer resume(Pair<SelectionKey, SSLEngine> state) {
-        SelectionKey key = state.getA();
+      public ByteBuffer resume( SelectionKey  state) {
+        SelectionKey key = state ;
         ByteBuffer buffer = on(key);
         if (null == buffer) {
-          SSLEngine sslEngine = state.getB();
+
           on(key, buffer = ByteBuffer.allocateDirect(sslEngine.getSession().getPacketBufferSize()));
         }
         return buffer;
@@ -228,7 +255,7 @@ public interface AsioVisitor {
         per.put(key, buffer);
         return key;
       }
-    }
+    }*/
   }
 
   class Helper {
@@ -237,43 +264,43 @@ public interface AsioVisitor {
     public static final Integer REALTIME_CUTOFF = Integer.parseInt(Config.get("REALTIME_CUTOFF", "3"));
 
 
-    /**
-     * called once client is connected, but before any bytes are read or written from socket.
-     *
-     * @param host        ssl remote host
-     * @param port        ssl remote port
-     * @param asioVisitor
-     * @param clientOps   ussually OP_WRITE but OP_READ for non-http protocols as well
-     * @throws Exception
-     */
-    public static void sslClient(final String host, final int port, final Impl asioVisitor, final int clientOps) throws Exception {
-      SocketChannel open = SocketChannel.open();
-      open.configureBlocking(false);
-      final InetSocketAddress remote = new InetSocketAddress(host, port);
-      open.connect(remote);
-      finishConnect(open, new F() {
-        @Override
-        public void apply(SelectionKey key) throws Exception {
-          log(key, "ssl", remote.toString());
-          SSLEngine sslEngine = SSLContext.getDefault().createSSLEngine(host, port);
-          sslEngine.setUseClientMode(true);
-          sslEngine.setWantClientAuth(false);
-          FSM.sslState.put(key, sslEngine);
-          FSM.sslGoal.put(key, Pair.<Integer, Object>pair(clientOps, asioVisitor));
-          FSM.needWrap(pair(key, sslEngine));
-        }
-      });
-
-    }
-
-    public static void sslClient(URI uri, Impl asioVisitor, int clientOps) throws Exception {
-      log(uri, "sslClient");
-      int port = uri.getPort();
-      if (port == -1) port = 443;
-      String host = uri.getHost();
-      sslClient(host, port, asioVisitor, clientOps);
-
-    }
+//    /**
+//     * called once client is connected, but before any bytes are read or written from socket.
+//     *
+//     * @param host        ssl remote host
+//     * @param port        ssl remote port
+//     * @param asioVisitor
+//     * @param clientOps   ussually OP_WRITE but OP_READ for non-http protocols as well
+//     * @throws Exception
+//     */
+//    public static void sslClient(final String host, final int port, final Impl asioVisitor, final int clientOps) throws Exception {
+//      SocketChannel open = SocketChannel.open();
+//      open.configureBlocking(false);
+//      final InetSocketAddress remote = new InetSocketAddress(host, port);
+//      open.connect(remote);
+//      finishConnect(open, new F() {
+//        @Override
+//        public void apply(SelectionKey key) throws Exception {
+//          log(key, "ssl", remote.toString());
+//          SSLEngine sslEngine = SSLContext.getDefault().createSSLEngine(host, port);
+//          sslEngine.setUseClientMode(true);
+//          sslEngine.setWantClientAuth(false);
+//          FSM.sslState.put(key, sslEngine);
+//          FSM.sslGoal.put(key, Pair.<Integer, Object>pair(clientOps, asioVisitor));
+//          FSM.needWrap(pair(key, sslEngine));
+//        }
+//      });
+//
+//    }
+//
+//    public static void sslClient(URI uri, Impl asioVisitor, int clientOps) throws Exception {
+//      log(uri, "sslClient");
+//      int port = uri.getPort();
+//      if (port == -1) port = 443;
+//      String host = uri.getHost();
+//      sslClient(host, port, asioVisitor, clientOps);
+//
+//    }
 
 
     public static Impl toRead(final F f) {
@@ -287,17 +314,10 @@ public interface AsioVisitor {
     }
 
     public static void toRead(SelectionKey key, F f) {
-      log(key,"toRead",f.toString());
-      SSLEngine sslEngine = FSM.sslState.get(key);
+      log(key,"toRead1",f.toString());
       key.interestOps(OP_READ).attach(toRead(f));
-      if (null != sslEngine && sslBacklog.toApp.resume(pair(key, sslEngine)).hasRemaining()) {
-        try {
-          f.apply(key);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      } else
-        key.selector().wakeup();
+
+      key.selector().wakeup();
 
     }
 
@@ -495,105 +515,101 @@ public interface AsioVisitor {
     }
 
     public static int write(SelectionKey key, ByteBuffer src) throws Exception {
-      SSLEngine sslEngine = FSM.sslState.get(key);
+//      SSLEngine sslEngine = FSM.sslState.get(key);
       int write = 0;
-      if (null == sslEngine) {
-        write = ((SocketChannel) key.channel()).write(src);
-        return write;
-      }
-      ByteBuffer toNet = sslBacklog.toNet.resume(pair(key, sslEngine));
-      ByteBuffer fromApp = sslBacklog.fromApp.resume(pair(key, sslEngine));
-      ByteBuffer origin = src.duplicate();
-      push(src, fromApp);
-      SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
-      fromApp.compact();
-      log("write:wrap: " + wrap);
-
-
-      switch (wrap.getHandshakeStatus()) {
-        case NOT_HANDSHAKING:
-        case FINISHED:
-          Status status = wrap.getStatus();
-          switch (status) {
-            case BUFFER_OVERFLOW:
-            case OK:
-              SocketChannel channel = (SocketChannel) key.channel();
-              int ignored = channel.write((ByteBuffer) toNet.flip());
-              toNet.compact();
-              int i = src.position() - origin.position();
-              return i;
-            case CLOSED:
-              key.cancel();
-              return -1;
-          }
-          break;
-        case NEED_TASK:
-        case NEED_WRAP:
-        case NEED_UNWRAP:
-          sslPush(key, sslEngine);
-          break;
-      }
-      return 0;
+      write = ((SocketChannel) key.channel()).write(src);
+      return write;
+//      ByteBuffer toNet = sslBacklog.toNet.resume(pair(key, sslEngine));
+//      ByteBuffer fromApp = sslBacklog.fromApp.resume(pair(key, sslEngine));
+//      ByteBuffer origin = src.duplicate();
+//      push(src, fromApp);
+//      SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
+//      fromApp.compact();
+//      log(key,"write:wrap: " + wrap);
+//
+//
+//      switch (wrap.getHandshakeStatus()) {
+//        case NOT_HANDSHAKING:
+//        case FINISHED:
+//          Status status = wrap.getStatus();
+//          switch (status) {
+//            case BUFFER_OVERFLOW:
+//            case OK:
+//              SocketChannel channel = (SocketChannel) key.channel();
+//              int ignored = channel.write((ByteBuffer) toNet.flip());
+//              toNet.compact();
+//              int i = src.position() - origin.position();
+//              return i;
+//            case CLOSED:
+//              key.cancel();
+//              return -1;
+//          }
+//          break;
+//        case NEED_TASK:
+//        case NEED_WRAP:
+//        case NEED_UNWRAP:
+//          sslPush(key, sslEngine);
+//          break;
+//      }
+//      return 0;
     }
 
     public static int read(SelectionKey key, ByteBuffer toApp) throws Exception {
-      SSLEngine sslEngine = FSM.sslState.get(key);
       int read = 0;
-      if (null == sslEngine) {
+      if (true) {
         read = ((SocketChannel) key.channel()).read(toApp);
         return read;
       }
-      ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
-      read = ((SocketChannel) key.channel()).read(fromNet);
-      ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
-      ByteBuffer origin = toApp.duplicate();
-      SSLEngineResult unwrap = sslEngine.unwrap(bb(fromNet, flip), overflow);
-      push(bb(overflow, flip), toApp);
-      if (overflow.hasRemaining())
-        log("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
-      overflow.compact();
-      fromNet.compact();
-      log("read:unwrap: " + unwrap);
-      Status status = unwrap.getStatus();
-      switch (unwrap.getHandshakeStatus()) {
-        case NOT_HANDSHAKING:
-        case FINISHED:
-          switch (status) {
-            case BUFFER_UNDERFLOW:
-              if (-1 == read) key.cancel();
-
-            case OK:
-              int i = toApp.position() - origin.position();
-              return i;
-
-            case CLOSED:
-              key.cancel();
-              return -1;
-
-          }
-
-          break;
-        case NEED_TASK:
-        case NEED_WRAP:
-        case NEED_UNWRAP:
-          sslPush(key, sslEngine);
-          break;
-      }
+//      ByteBuffer fromNet = sslBacklog.fromNet.resume(pair(key, sslEngine));
+//      read = ((SocketChannel) key.channel()).read(fromNet);
+//      ByteBuffer overflow = sslBacklog.toApp.resume(pair(key, sslEngine));
+//      ByteBuffer origin = toApp.duplicate();
+//      SSLEngineResult unwrap = sslEngine.unwrap(bb(fromNet, flip), overflow);
+//      push(bb(overflow, flip), toApp);
+//      if (overflow.hasRemaining())
+//        log("**!!!* sslBacklog.toApp retaining " + overflow.remaining() + " bytes");
+//      overflow.compact();
+//      fromNet.compact();
+//      log("read:unwrap: " + unwrap);
+//      Status status = unwrap.getStatus();
+//      switch (unwrap.getHandshakeStatus()) {
+//        case NOT_HANDSHAKING:
+//        case FINISHED:
+//          switch (status) {
+//            case BUFFER_UNDERFLOW:
+//              if (-1 == read) {
+//                key.cancel();
+//                return -1;
+//              }
+//            case OK:
+//              int i = toApp.position() - origin.position();
+//              return i;
+//            case CLOSED:
+//              key.cancel();
+//              return -1;
+//          }
+//          break;
+//        case NEED_TASK:
+//        case NEED_WRAP:
+//        case NEED_UNWRAP:
+//          sslPush(key, sslEngine);
+//          break;
+//      }
 
       return 0;
     }
 
-    public static void sslPop(SelectionKey key) {
-      Pair<Integer, Object> remove = FSM.sslGoal.remove(key);
-      key.interestOps(remove.getA()).attach(remove.getB());
-      key.selector().wakeup();
-    }
-
-    public static void sslPush(SelectionKey key, SSLEngine engine) throws Exception {
-      log(key, "sslPush");
-      FSM.sslGoal.put(key, pair(key.interestOps(), key.attachment()));
-      FSM.handShake(pair(key, engine));
-    }
+//    public static void sslPop(SelectionKey key) {
+//      Pair<Integer, Object> remove = FSM.sslGoal.remove(key);
+//      key.interestOps(remove.getA()).attach(remove.getB());
+//      key.selector().wakeup();
+//    }
+//
+//    public static void sslPush(SelectionKey key, SSLEngine engine) throws Exception {
+//      log(key, "sslPush");
+//      FSM.sslGoal.put(key, pair(key.interestOps(), key.attachment()));
+//      FSM.handShake(pair(key, engine));
+//    }
 
     /**
      * like finishWrite however does not coalesce buffers together
