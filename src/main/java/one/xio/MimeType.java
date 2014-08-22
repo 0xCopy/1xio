@@ -163,8 +163,8 @@ public enum MimeType {
 	ics("text/calendar"), //
 	icz("text/calendar"), //
 	ief("image/ief"), //
-	iges("model/iges"), //
-	igs("model/iges"), //
+	iges("depModel/iges"), //
+	igs("depModel/iges"), //
 	iii("application/x-iphone"), //
 	inp("chemical/x-gamess-input"), //
 	ins("application/x-internet-signup"), //
@@ -216,7 +216,7 @@ public enum MimeType {
 	mcm("chemical/x-macmolecule"), //
 	mdb("application/msaccess"), //
 	me("application/x-troff-me"), //
-	mesh("model/mesh"), //
+	mesh("depModel/mesh"), //
 	mid("audio/midi"), //
 	midi("audio/midi"), //
 	mif("application/x-mif"), //
@@ -244,7 +244,7 @@ public enum MimeType {
 	mpga("audio/mpeg"), //
 	mpg("video/mpeg"), //
 	ms("application/x-troff-ms"), //
-	msh("model/mesh"), //
+	msh("depModel/mesh"), //
 	msi("application/x-msi"), //
 	mvb("chemical/x-mopac-vib"), //
 	mxu("video/vnd.mpegurl"), //
@@ -353,7 +353,7 @@ public enum MimeType {
 	shtml("text/html"), //
 	sid("audio/prs.sid"), //
 	sik("application/x-trash"), //
-	silo("model/mesh"), //
+	silo("depModel/mesh"), //
 	sis("application/vnd.symbian.install"), //
 	sisx("x-epoc/x-sisx-app"), //
 	sit("application/x-stuffit"), //
@@ -419,7 +419,7 @@ public enum MimeType {
 	vcs("text/x-vcalendar"), //
 	vmd("chemical/x-vmd"), //
 	vms("chemical/x-vamas-iso14976"), //
-	$vrml("model/vrml"), //
+	$vrml("depModel/vrml"), //
 	vrml("x-world/x-vrml"), //
 	vrm("x-world/x-vrml"), //
 	vsd("application/vnd.visio"), //
@@ -441,7 +441,7 @@ public enum MimeType {
 	wmz("application/x-ms-wmz"), //
 	wp5("application/wordperfect5.1"), //
 	wpd("application/wordperfect"), //
-	$wrl("model/vrml"), //
+	$wrl("depModel/vrml"), //
 	wrl("x-world/x-vrml"), //
 	wsc("text/scriptlet"), //
 	wvx("video/x-ms-wvx"), //

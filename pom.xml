@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>1xio</groupId>
     <artifactId>1xio</artifactId>
-    <version>2.0-ANYNPO</version>
+    <version>2.0.1</version>
 
     <dependencies>
         <dependency>
             <groupId>bbcursive</groupId>
             <artifactId>bbcursive</artifactId>
-            <version>0.1.0-anyNPO</version>
+            <version>0.1.0.1</version>
         </dependency>
     </dependencies>
     <build>
