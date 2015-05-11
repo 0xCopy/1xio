@@ -565,7 +565,7 @@ public enum HttpHeaders {
 	}
 
 	public String getHeader() {
-		return header.intern();
+		return header;
 	}
 
 	public ByteBuffer getToken() {

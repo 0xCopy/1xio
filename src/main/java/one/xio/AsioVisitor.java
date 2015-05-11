@@ -287,7 +287,7 @@ public interface AsioVisitor {
     }
 
     public static void toRead(SelectionKey key, F f) {
-      log(key,"toRead",f.toString());
+      log(key, "toRead", f.toString());
       SSLEngine sslEngine = FSM.sslState.get(key);
       key.interestOps(OP_READ).attach(toRead(f));
       if (null != sslEngine && sslBacklog.toApp.resume(pair(key, sslEngine)).hasRemaining()) {
@@ -312,7 +312,7 @@ public interface AsioVisitor {
     }
 
     public static void toConnect(SelectionKey key, Impl impl) {//toConnect
-      log (key,"toConnect",impl.toString());
+      log(key, "toConnect", impl.toString());
       key.interestOps(OP_CONNECT).attach(impl);
       key.selector().wakeup();
     }
@@ -328,14 +328,14 @@ public interface AsioVisitor {
     public static void finishConnect(final SocketChannel channel, final F onSuccess) throws Exception {
       //finishConnect
       SingleThreadSingletonServer.enqueue(channel, OP_CONNECT,
-          toConnect(new F() {
-            @Override
-            public void apply(SelectionKey key) throws Exception {
-              if (channel.finishConnect()) {
-                onSuccess.apply(key);
-              }
-            }
-          }));
+              toConnect(new F() {
+                @Override
+                public void apply(SelectionKey key) throws Exception {
+                  if (channel.finishConnect()) {
+                    onSuccess.apply(key);
+                  }
+                }
+              }));
     }
 
     public static void toWrite(SelectionKey key, F f) {
@@ -476,14 +476,20 @@ public interface AsioVisitor {
                                    ByteBuffer... payload) {
       log(onSuccess, "finishWrite-pre");
       ByteBuffer cursor = std.cat(payload);
-      if (cursor.hasRemaining())
-        toWrite(key, finishWrite(onSuccess, cursor));
-      else
-        try {
-          onSuccess.apply(key);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
+      try {
+        SocketChannel channel = (SocketChannel) key.channel();
+        if(cursor.hasRemaining())channel.write(cursor); if (cursor.hasRemaining())
+          toWrite(key, finishWrite(onSuccess, cursor));
+        else
+          try {
+            onSuccess.apply(key);
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+
     }
 
     public static int read(Channel channel, ByteBuffer fromNet) throws Exception {
