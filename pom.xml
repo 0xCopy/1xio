@@ -7,10 +7,12 @@
     <groupId>com.github.0xCopy</groupId>
     <artifactId>1xio</artifactId>
     <version>2.0.6</version>
-    <repositories>	<repository>
-        <id>jitpack.io</id>
-        <url>https://jitpack.io</url>
-    </repository></repositories>
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
     <dependencies>
         <dependency>
             <groupId>com.github.0xCopy</groupId>
