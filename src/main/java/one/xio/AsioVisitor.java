@@ -25,6 +25,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static bbcursive.Cursive.pre.flip;
+import static bbcursive.lib.log.log;
+import static bbcursive.lib.push.push;
 import static bbcursive.std.*;
 import static java.lang.StrictMath.min;
 import static java.nio.channels.SelectionKey.*;
