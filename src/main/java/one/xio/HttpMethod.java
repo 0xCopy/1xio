@@ -7,5 +7,5 @@ package one.xio;
  * Time: 10:12:22 PM
  */
 public enum HttpMethod {
-	GET, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION
+    GET, POST, PUT, HEAD, DELETE, TRACE, CONNECT, OPTIONS, HELP, VERSION
 }

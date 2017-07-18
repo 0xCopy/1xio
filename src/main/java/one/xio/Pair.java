@@ -2,47 +2,50 @@ package one.xio;
 
 /**
  * Simple pair class.
- * 
+ *
  * @param <A> any type
  * @param <B> any type
  */
 public class Pair<A, B> {
-	private final A a;
-	private final B b;
+    private final A a;
+    private final B b;
 
-	public Pair(A a, B b) {
-		this.a = a;
-		this.b = b;
-	}
+    public Pair(A a, B b) {
+        this.a = a;
+        this.b = b;
+    }
 
-	public static<A,B > Pair <A,B> pair(A a,B b){return new Pair<>(a, b);}
-	public A getA() {
-		return a;
-	}
+    public static <A, B> Pair<A, B> pair(A a, B b) {
+        return new Pair<>(a, b);
+    }
 
-	public B getB() {
-		return b;
-	}
+    public A getA() {
+        return a;
+    }
 
-	public boolean equals(Object o) {
-		if (this != o) {
-			if (o instanceof Pair) {
+    public B getB() {
+        return b;
+    }
 
-				Pair pair = (Pair) o;
+    public boolean equals(Object o) {
+        if (this != o) {
+            if (o instanceof Pair) {
 
-				return !((null != a ? !a.equals(pair.a) : null != pair.a) || (null != b
-						? !b.equals(pair.b)
-						: null != pair.b));
+                Pair pair = (Pair) o;
 
-			}
-			return false;
-		}
-		return true;
-	}
+                return !((null != a ? !a.equals(pair.a) : null != pair.a) || (null != b
+                        ? !b.equals(pair.b)
+                        : null != pair.b));
 
-	public int hashCode() {
-		int result = null != a ? a.hashCode() : 0;
-		result = 31 * result + (null != b ? b.hashCode() : 0);
-		return result;
-	}
+            }
+            return false;
+        }
+        return true;
+    }
+
+    public int hashCode() {
+        int result = null != a ? a.hashCode() : 0;
+        result = 31 * result + (null != b ? b.hashCode() : 0);
+        return result;
+    }
 }
