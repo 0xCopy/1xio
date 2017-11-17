@@ -133,7 +133,7 @@ public interface AsioVisitor {
             final ByteBuffer fromNet = sslBacklog.fromNet.resume(state);
             ByteBuffer toApp = sslBacklog.toApp.resume(state);
             SSLEngine sslEngine = state.getB();
-            SSLEngineResult unwrap = sslEngine.unwrap(fromNet.flip(), toApp);
+            SSLEngineResult unwrap = sslEngine.unwrap((ByteBuffer) fromNet.flip(), toApp);
             System.err.println("" + unwrap);
             fromNet.compact();
 
@@ -180,7 +180,7 @@ public interface AsioVisitor {
                     throw new Error("not supposed to happen here");
                 case OK:
                     SocketChannel channel = (SocketChannel) state.getA().channel();
-                    channel.write(toNet.flip());
+                    channel.write((ByteBuffer) toNet.flip());
                     toNet.compact();
                     fromApp.compact();
                     handShake(state);
@@ -492,7 +492,7 @@ public interface AsioVisitor {
             ByteBuffer fromApp = sslBacklog.fromApp.resume(pair(key, sslEngine));
             ByteBuffer origin = src.duplicate();
             push(src, fromApp);
-            SSLEngineResult wrap = sslEngine.wrap(fromApp.flip(), toNet);
+            SSLEngineResult wrap = sslEngine.wrap((ByteBuffer) fromApp.flip(), toNet);
             fromApp.compact();
             log("write:wrap: " + wrap);
 
@@ -505,7 +505,7 @@ public interface AsioVisitor {
                         case BUFFER_OVERFLOW:
                         case OK:
                             SocketChannel channel = (SocketChannel) key.channel();
-                            int ignored = channel.write(toNet.flip());
+                            int ignored = channel.write((ByteBuffer) toNet.flip());
                             toNet.compact();
                             return src.position() - origin.position();
                         case CLOSED:
