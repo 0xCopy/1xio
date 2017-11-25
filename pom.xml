@@ -8,7 +8,7 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <kotlin.version>1.2.0-rc-39</kotlin.version>
+        <kotlin.version>1.2.0-rc-84</kotlin.version>
         <junit.version>4.12</junit.version>
     </properties>
     <dependencies>
@@ -22,8 +22,12 @@
             <artifactId>kotlinx-coroutines-core</artifactId>
             <version>0.19.3</version>
         </dependency>
-    </dependencies>
+     </dependencies>
     <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
         <repository>
             <releases>
                 <enabled>true</enabled>
@@ -74,11 +78,19 @@
                 </executions>
                 <configuration>
                     <sourceDirs>
-                           <sourceDirectory>src/main/java</sourceDirectory>
+                        <sourceDirectory>src/main/java</sourceDirectory>
                         <sourceDirectory>src/main/kotlin</sourceDirectory>
                     </sourceDirs>
                     <jvmTarget>1.8</jvmTarget>
                     <experimentalCoroutines>enable</experimentalCoroutines>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.7</source>
+                    <target>1.7</target>
                 </configuration>
             </plugin>
         </plugins>

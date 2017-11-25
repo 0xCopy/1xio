@@ -573,5 +573,11 @@ enum class HttpHeaders {
     `X-Device-User-Agent`,
     ;
 
+    private var _tokenLen = name.length
+    private var tokenLen: Int
+        get() = _tokenLen
+        set(value) {
+            _tokenLen = value
+        }
 }
 
