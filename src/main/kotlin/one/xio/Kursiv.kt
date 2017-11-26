@@ -2,22 +2,25 @@
 
 package one.xio
 
+import java.lang.Character.*
 import java.nio.*
 import java.nio.ByteBuffer.*
 
 
-fun ByteBuffer.debug() = apply { System.err.println("%%: " + str(dup().rew())) }
+fun ByteBuffer.debug() = apply {
+    System.err.println("%%: " + str(dup().rew()))
+}
 
 private fun ByteBuffer.rew() = apply { rewind() }
 
 
- fun ByteBuffer.dup() = duplicate() as ByteBuffer
+fun ByteBuffer.dup() = duplicate() as ByteBuffer
 
 
 /** moves the cursor to get() the next non-ws byte */
 fun ByteBuffer.forceSkipWs() = apply {
     val position = position()
-    while (hasRemaining() && Character.isWhitespace(get().toInt())) {
+    while (hasRemaining() && isWhitespace(get().toInt())) {
     };
     when {
         !hasRemaining() -> {
@@ -30,26 +33,13 @@ fun ByteBuffer.forceSkipWs() = apply {
 
 
 fun ByteBuffer.seekWs() = apply {
-    while (hasRemaining() && !Character.isWhitespace(get().toInt()));
+    while (hasRemaining() && !isWhitespace(get().toInt()));
 }
 
 fun ByteBuffer.skipWs() = apply {
-
-    var rem = false
-    var captured = false
-    var r = false
-    while (run { rem = hasRemaining(); rem } && run {
-        run {
-            r = Character.isWhitespace(0xff.and((mk()).get().toInt())); r
-        }; captured = captured || r; captured
-    } && r);
-
-    when {
-        captured && rem -> reset()
-        captured -> this
-        else -> throw SkipException()
-    }
-
+    var open=false;
+    while (let{open=hasRemaining();open} && isWhitespace(get().toChar()));
+    if(open)back1()
 }
 
 
@@ -84,7 +74,7 @@ fun ByteBuffer.noop() = this
 fun ByteBuffer.skipDigits() = apply { while (hasRemaining() && Character.isDigit(get().toInt())); }
 
 fun ByteBuffer.comp() = compact()!!
-fun ByteBuffer.cp(): ByteBuffer  = cat(ZERO_BUFFER, this.dup())
+fun ByteBuffer.cp(): ByteBuffer = cat(ZERO_BUFFER, this.dup())
 
 
 fun ByteBuffer.res() = reset() as ByteBuffer
@@ -107,20 +97,20 @@ fun ByteBuffer.grow() = ByteBuffer.allocateDirect(capacity() shl 1).put(this)!!
 
 fun ByteBuffer.fl() = flip() as ByteBuffer
 fun ByteBuffer.mk() = mark() as ByteBuffer
-fun ByteBuffer.lim(a: Int) = apply{limit(a)}
+fun ByteBuffer.lim(a: Int) = apply { limit(a) }
 /**
  * sets the position to before the current WS
  */
 fun ByteBuffer.rtrim() = apply {
     val start = position()
-    var i = start; while (0 <= --i && Character.isWhitespace(get(i).toInt()));
+    var i = start; while (0 <= --i && isWhitespace(get(i).toInt()));
     position(++i) as ByteBuffer
 }
 
 fun cat(vararg src: ByteBuffer) = allocateDirect(src.sumBy(ByteBuffer::remaining))!!.apply {
-    assert (!src.isEmpty(),{"cannot cat with no args"});
+    assert(!src.isEmpty(), { "cannot cat with no args" });
     when {
-        src.size==1 -> return src[0]
+        src.size == 1 -> return src[0]
         else -> src.forEach { put(it) }
     }
 }

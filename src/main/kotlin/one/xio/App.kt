@@ -17,7 +17,7 @@ class App(private var selector: Selector = Selector.open()) {
 
     fun start(defaultVisitor: (SelectionKey) -> Unit?) {
         while (selector.isOpen) {
-            val select = selector.select(5000)
+            val select = selector.select(250)
             if (select > 0) {
                 val selectedKeys = selector.selectedKeys()
 
@@ -25,7 +25,7 @@ class App(private var selector: Selector = Selector.open()) {
                     val map: List<Job> = selectedKeys.map { key2 ->
                         val visitor: Visitor = (key2.attachment() ?: defaultVisitor) as Visitor
                         val job = launch {
-                            log("launched visitor " + visitor)
+                            //                            log("launched visitor " + visitor)
                             visitor.invoke(key2)
                         }
                         job
@@ -57,54 +57,69 @@ fun http1_1_Acceptor(it: SelectionKey) {
 
         val allReads = Channel<ByteBuffer>(Channel.UNLIMITED)
 
-        launch {
-            val headerLines = Channel<ByteBuffer>()
+        /**
+         * this is our READ
+         */
+        val spawn = it.spawn(newChannel = newChannel, interestOps = SelectionKey.OP_READ, visitor = { selectionKey ->
+            val read = selectionKey.read()
+            read?.apply {
+                runBlocking {
+                    val resume = selectionKey.interestOps()
+                    selectionKey.interestOps(0)
+                    val fl = read.dup().fl()
 
+                    if (fl.hasRemaining()) allReads + fl // flip ops here in blocking context.
+                    selectionKey.interestOps(resume)
+                }
+
+            }
+        })
+
+        launch {
+            val headerLines = Channel<ByteBuffer>(1)
+            launch {
+                while (!headerLines.isClosedForReceive) {
+                    val receive = headerLines.receive().debug()
+
+                }
+            }
             var input: ByteBuffer? = null
 
             while (true) {
                 val receive = allReads.receive()
 
-                val cursor = when {
+                var cursor = when {
                     input != null -> cat(input, receive)
-                    else -> receive.apply { input = receive.cp() }
+                    else -> receive.apply { input = receive.cp().fl() }
                 }
                 do {
                     var stillSpace = true
                     var foundLF = false
-                    while (let { stillSpace = cursor.hasRemaining();stillSpace } && !let { foundLF = cursor.mk().get().toInt() and 0xff != '\n'.toInt();foundLF }) {
+                    while (let { stillSpace = cursor.hasRemaining();stillSpace } && !let { foundLF = cursor.mk().get().toInt() and 0xff == '\n'.toInt();foundLF }) {
                     };
                     when {
                         !stillSpace -> cursor.flip()
                         else -> if (foundLF) {
                             val position1 = cursor.position()
                             cursor.rtrim()
-                            val amtOfWhiteSpace = position1 - cursor.position()
+                            val position = cursor.position()
+                            val amtOfWhiteSpace = position1 - position
                             when {
-                                3 > amtOfWhiteSpace/*we found the header end.*/ -> return@launch
-                                else -> headerLines.send(/*str*/(/*cat*/(/*EMPTY_SET, */cursor.fl().slice())))
+                                2< amtOfWhiteSpace/*we found the header end.*/ -> return@launch
+                                else -> {
+                                    headerLines.send(cursor.dup().fl() )
+                                    cursor=cursor.skipWs().slice()
+                                }
                             }
-                            cursor.skipWs();
                         }
+
                     }
                 } while (cursor.hasRemaining())
-                input = cursor;
+
+
             }
         }
 
-        /**
-         * this is our READ
-         */
-        it.spawn(newChannel, SelectionKey.OP_READ, {
-            val read = it.read()
-            read?.apply {
-                runBlocking {
-                    allReads + read.dup().fl() // flip ops here in blocking context.
-
-                }
-
-            }
-        })
 
     }
 }
@@ -125,8 +140,8 @@ fun SelectionKey.read(payload: ByteBuffer = ByteBuffer.allocateDirect(512)): Byt
 
 }
 
-fun SelectionKey.spawn(newChannel: SocketChannel, interestOps: Int, visitor: (SelectionKey) -> Unit): Unit {
-    newChannel.register(this.selector(), interestOps, visitor)
+fun SelectionKey.spawn(newChannel: SocketChannel, interestOps: Int, visitor: (SelectionKey) -> Unit): SelectionKey? {
+    return newChannel.register(this.selector(), interestOps, visitor)
 }
 
 fun main(args: Array<String>) {
