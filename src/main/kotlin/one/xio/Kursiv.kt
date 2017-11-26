@@ -1,96 +1,126 @@
+@file:Suppress("UNUSED_EXPRESSION")
+
 package one.xio
 
 import java.nio.*
+import java.nio.ByteBuffer.*
 
-val duplicate: bub = ByteBuffer::duplicate
-val flip: bub = { it.flip() as ByteBuffer }
-val slice: bub = ByteBuffer::slice
-val mark: bub = { it.mark() as ByteBuffer }
-val debug : bub= { it: ByteBuffer ->
-        System.err.println("%%: " + str(it, duplicate, rewind))
-         it
-    }
 
-val forceSkipWs: bub = {
-    val position = it.position()
-    while (it.hasRemaining() && Character.isWhitespace(
-            it.get().toInt())); if (!it.hasRemaining()) {
-    it.position(position); throw BufferUnderflowException()
-}
-    bb(it, back1)
-}
-val toWs: bub = { target ->
-    while (target.hasRemaining() && !Character.isWhitespace(target.get().toInt())) {
-    }
-    target
-}
+fun ByteBuffer.debug() = apply { System.err.println("%%: " + str(dup().rew())) }
 
-object skipWs : bub {
-    override fun invoke(p1: ByteBuffer): ByteBuffer {
-        var rem = false
-        var captured = false
-        var r = false
+private fun ByteBuffer.rew() = apply { rewind() }
 
-        while (
-        let { rem = p1.hasRemaining();rem } &&
-                let {
-                    val other = let {
-                        r = Character.isWhitespace(0xff.and((p1.mark() as ByteBuffer).get().toInt()))
-                        r
-                    }
-                    captured = captured||(other)
-                    captured
-                } && r);
-        when {
-            captured && rem -> return p1.reset() as ByteBuffer
-            captured -> p1
-            else -> throw SkipException()
+
+ fun ByteBuffer.dup() = duplicate() as ByteBuffer
+
+
+/** moves the cursor to get() the next non-ws byte */
+fun ByteBuffer.forceSkipWs() = apply {
+    val position = position()
+    while (hasRemaining() && Character.isWhitespace(get().toInt())) {
+    };
+    when {
+        !hasRemaining() -> {
+            position(position);
+            throw BufferUnderflowException()
         }
+        else -> back1()
+    }
+}
 
-        return p1
+
+fun ByteBuffer.seekWs() = apply {
+    while (hasRemaining() && !Character.isWhitespace(get().toInt()));
+}
+
+fun ByteBuffer.skipWs() = apply {
+
+    var rem = false
+    var captured = false
+    var r = false
+    while (run { rem = hasRemaining(); rem } && run {
+        run {
+            r = Character.isWhitespace(0xff.and((mk()).get().toInt())); r
+        }; captured = captured || r; captured
+    } && r);
+
+    when {
+        captured && rem -> reset()
+        captured -> this
+        else -> throw SkipException()
     }
 
 }
+
 
 /**
  * best attempt to find EOL
  */
-val toEol: bub = {
-    while (it.hasRemaining() && '\n'.toByte() != it.get());
-    it
-}
-val back1: bub = {
-    val position = it.position()
-    (if (0 < position) it.position(position - 1) else it) as ByteBuffer
-}
-val back2: bub = {
-    val position = it.position()
-    (if (1 < position) it.position(position - 2) else bb(it,
-                                                                 back1)) as ByteBuffer
-}
-val rtrim: bub = {
-    val start = it.position()
-    var i = start; while (0 <= --i && Character.isWhitespace(it.get(i).toInt()));
-    it.position(++i) as ByteBuffer
+fun ByteBuffer.toEol() = apply {
+    while (hasRemaining() && '\n'.toByte() != get());
 }
 
-val noop : bub ={  it }
+/** moves the pointer back one  */
+fun ByteBuffer.back1(): ByteBuffer = apply {
+    val position = position()
+    when {
+        0 < position -> position(position - 1)
+    }
+}
 
-val skipDigits: bub = {
-    while (it.hasRemaining() && Character.isDigit(it.get().toInt()));
-    it
+/**
+ * moves thepointer back 2@see
+ */
+fun ByteBuffer.back2() = apply {
+    val position = position()
+    when {
+        1 < position -> position(position - 2)
+        else -> back1()
+    }
 }
-val compact: bub = ByteBuffer::compact
-val reset: bub = { it.reset() as ByteBuffer }
-val rewind: bub = { it.rewind() as ByteBuffer }
-val clear: bub = { it.clear() as ByteBuffer }
-val ro: bub = ByteBuffer::asReadOnlyBuffer
-val pad0: bub = {
-    while (it.hasRemaining()) it.put(0.toByte())
-    it
+
+fun ByteBuffer.noop() = this
+
+fun ByteBuffer.skipDigits() = apply { while (hasRemaining() && Character.isDigit(get().toInt())); }
+
+fun ByteBuffer.comp() = compact()!!
+fun ByteBuffer.cp(): ByteBuffer  = cat(ZERO_BUFFER, this.dup())
+
+
+fun ByteBuffer.res() = reset() as ByteBuffer
+fun ByteBuffer.clr() = clear() as ByteBuffer
+fun ByteBuffer.ro() = asReadOnlyBuffer()!!
+
+fun ByteBuffer.pad0() = apply {
+    while (hasRemaining()) put(0.toByte())
 }
-val pad0Until: bub = {
-    val limit = it.limit(); it.flip(); while (it.hasRemaining()) it.put(0.toByte()); it.limit(
-        limit) as ByteBuffer
+
+/**
+ * stuffs 0's into the buffer from 0->position
+ */
+fun ByteBuffer.pad0UntilPosition() = apply {
+    val flip1 = dup().fl()
+    while (flip1.hasRemaining()) flip1.put(0.toByte());
 }
-val grow: bub = { ByteBuffer.allocateDirect(it.capacity() shl 1).put(it) }
+
+fun ByteBuffer.grow() = ByteBuffer.allocateDirect(capacity() shl 1).put(this)!!
+
+fun ByteBuffer.fl() = flip() as ByteBuffer
+fun ByteBuffer.mk() = mark() as ByteBuffer
+fun ByteBuffer.lim(a: Int) = apply{limit(a)}
+/**
+ * sets the position to before the current WS
+ */
+fun ByteBuffer.rtrim() = apply {
+    val start = position()
+    var i = start; while (0 <= --i && Character.isWhitespace(get(i).toInt()));
+    position(++i) as ByteBuffer
+}
+
+fun cat(vararg src: ByteBuffer) = allocateDirect(src.sumBy(ByteBuffer::remaining))!!.apply {
+    assert (!src.isEmpty(),{"cannot cat with no args"});
+    when {
+        src.size==1 -> return src[0]
+        else -> src.forEach { put(it) }
+    }
+}
