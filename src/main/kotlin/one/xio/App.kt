@@ -9,10 +9,26 @@ import java.nio.channels.*
 
 typealias Visitor = (SelectionKey) -> Unit
 
+fun main(args: Array<String>) {
+    val app = App()
+    launch { app.start(::http1_1_Acceptor) }
+    launch {
+        delay(500)
+        app.listen(ServerSocketChannel.open().bind(
+                InetSocketAddress(8080))!!.configureBlocking(false)!!, ::http1_1_Acceptor)
+    }
+    val lock = Object()
+    synchronized(lock) {
+        lock.wait()
+    }
+}
+
 class App(private var selector: Selector = Selector.open()) {
-    fun listen(socket: SelectableChannel, att: (SelectionKey) -> Unit): SelectionKey {
+    fun listen(socket: SelectableChannel, att: (SelectionKey) -> Unit)
+            = socket.register(selector,
+                              SelectionKey.OP_ACCEPT,
+                              att).apply {
         System.err.println("listener assigned")
-        return socket.register(selector, SelectionKey.OP_ACCEPT, att)!!
     }
 
     fun start(defaultVisitor: (SelectionKey) -> Unit?) {
@@ -46,8 +62,6 @@ fun http1_1_Acceptor(it: SelectionKey) {
     /** this is the ACCEPTOR
      *
      */
-
-
     val serverSocketChannel = it.channel() as ServerSocketChannel
     val newChannel = serverSocketChannel.accept()
 
@@ -57,31 +71,23 @@ fun http1_1_Acceptor(it: SelectionKey) {
 
         val allReads = Channel<ByteBuffer>(Channel.UNLIMITED)
 
-        /**
-         * this is our READ
-         */
-        val spawn = it.spawn(newChannel = newChannel, interestOps = SelectionKey.OP_READ, visitor = { selectionKey ->
-            val read = selectionKey.read()
+        newChannel.register(it.selector(), SelectionKey.OP_READ, { it: SelectionKey ->
+            val read = it.read()
             read?.apply {
                 runBlocking {
-                    val resume = selectionKey.interestOps()
-                    selectionKey.interestOps(0)
+                    val resume = it.interestOps()
+                    it.interestOps(0)
                     val fl = read.dup().fl()
-
                     if (fl.hasRemaining()) allReads + fl // flip ops here in blocking context.
-                    selectionKey.interestOps(resume)
+                    it.interestOps(resume)
                 }
-
             }
         })
 
         launch {
             val headerLines = Channel<ByteBuffer>(1)
             launch {
-                while (!headerLines.isClosedForReceive) {
-                    val receive = headerLines.receive().debug()
-
-                }
+                while (!headerLines.isClosedForReceive) headerLines.receive().debug()
             }
             var input: ByteBuffer? = null
 
@@ -105,29 +111,20 @@ fun http1_1_Acceptor(it: SelectionKey) {
                             val position = cursor.position()
                             val amtOfWhiteSpace = position1 - position
                             when {
-                                2< amtOfWhiteSpace/*we found the header end.*/ -> return@launch
+                                2 < amtOfWhiteSpace/*we found the header end.*/ -> return@launch
                                 else -> {
-                                    headerLines.send(cursor.dup().fl() )
-                                    cursor=cursor.skipWs().slice()
+                                    headerLines.send(cursor.dup().fl())
+                                    cursor = cursor.skipWs().slice()
                                 }
                             }
                         }
-
                     }
                 } while (cursor.hasRemaining())
-
-
             }
         }
-
-
     }
 }
 
-
-operator fun ByteBuffer.plusAssign(receive: ByteBuffer) {
-    put(receive)
-}
 
 suspend operator fun <E> Channel<E>.plus(read: E) = send(read)
 
@@ -139,26 +136,3 @@ fun SelectionKey.read(payload: ByteBuffer = ByteBuffer.allocateDirect(512)): Byt
     return null
 
 }
-
-fun SelectionKey.spawn(newChannel: SocketChannel, interestOps: Int, visitor: (SelectionKey) -> Unit): SelectionKey? {
-    return newChannel.register(this.selector(), interestOps, visitor)
-}
-
-fun main(args: Array<String>) {
-    val app = App()
-    launch { app.start(::http1_1_Acceptor) }
-    launch {
-        delay(500)
-        app.listen(ServerSocketChannel.open().bind(
-                InetSocketAddress(8080))!!.configureBlocking(false)!!, ::http1_1_Acceptor)
-    }
-    val lock = Object()
-    synchronized(lock) {
-        lock.wait()
-    }
-
-}
-
-
-class SkipException : Throwable()
-

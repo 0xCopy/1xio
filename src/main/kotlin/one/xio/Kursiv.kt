@@ -70,13 +70,9 @@ fun ByteBuffer.back2() = apply {
 }
 
 fun ByteBuffer.noop() = this
-
 fun ByteBuffer.skipDigits() = apply { while (hasRemaining() && Character.isDigit(get().toInt())); }
-
 fun ByteBuffer.comp() = compact()!!
 fun ByteBuffer.cp(): ByteBuffer = cat(ZERO_BUFFER, this.dup())
-
-
 fun ByteBuffer.res() = reset() as ByteBuffer
 fun ByteBuffer.clr() = clear() as ByteBuffer
 fun ByteBuffer.ro() = asReadOnlyBuffer()!!
