@@ -1,9 +1,14 @@
-//@file:Suppress("UNUSED_EXPRESSION")
+/**
+ * Syntactic Sugar for NIO objects
+ */
 package one.xio
 
+import kotlinx.coroutines.experimental.channels.Channel
 import java.lang.Character.*
 import java.nio.*
 import java.nio.ByteBuffer.*
+import java.nio.channels.*
+
 
 /**  convenience method to reduce verbosity and extra cast operations for pre-jdk9 NIO  */
 val ByteBuffer.debug get() = apply { debug("%%: " + dup.rew.str()) }
@@ -143,7 +148,7 @@ val ByteBuffer.int0xff: Int
 //(a: Int) = limit(a) as ByteBuffer
 var ByteBuffer.lim
     get() = limit()
-    set(l){
+    set(l) {
         limit(l)
     }
 /**
@@ -215,3 +220,99 @@ fun log(s: String) = System.err.println(s)
  *
  */
 fun ByteBuffer.str() = Charsets.UTF_8.decode(this).toString()
+
+fun java.nio.channels.SelectionKey.wakeup() {
+    selector().wakeup()
+}
+
+infix operator fun SelectionKey.plusAssign(op: Int) {
+    interestOps(interestOps() or op)
+}
+
+infix operator fun SelectionKey.minusAssign(op: Int) {
+    interestOps(interestOps() and (0xff xor op))
+}
+
+fun SelectionKey.visit() {
+    (visitor ?: SelectionKey::close)(this)
+}
+
+/** error response */
+fun SelectionKey.simpleresponse(httpStatus: HttpStatus,
+                                onSuccess: Visitor? = SelectionKey::close, vararg payload: ByteBuffer) {
+    this += SelectionKey.OP_WRITE
+    visitor = {
+        val s = "HTTP/1.1 ${httpStatus.name} ${httpStatus.caption}\r\n"
+        write(cat(s.buf, *payload).fl, onSuccess)
+    }
+    wakeup()
+}
+
+val String.buf: ByteBuffer
+    get() = Charsets.UTF_8.encode(this)!!
+
+fun SelectionKey.write(payload: ByteBuffer, success: Visitor? = null) {
+//    payload.guess
+    debug(payload.toString())
+    visitor = {
+        if (payload.hasRemaining())
+            socket.write(payload)
+        if (payload.hasRemaining().not()) {
+            visitor = success ?: { it.flush().close() }
+        }
+    }
+    this += SelectionKey.OP_WRITE
+    wakeup()
+}
+
+private fun SelectionKey.flush() = apply {
+    this.socket.socket().getOutputStream().flush()
+}
+
+/** convenience method to write a buffer then stop the OP_WRITE interest then execute success Visitor */
+fun SelectionKey.write(s: String, success: Visitor? = null) {
+    val payload = Charsets.UTF_8.encode(s)
+    write(payload, success)
+
+}
+
+var SelectionKey.visitor: Visitor?
+    get() = attachment() as Visitor? ?: SelectionKey::close
+    set(value) {
+        attach(value)
+    }
+
+val SelectionKey.socket
+    get() = channel() as SocketChannel
+/**
+ * sometimes you just can't keep it straight
+ */
+val ByteBuffer.guess: ByteBuffer
+    get() = when {
+        lim == 0 -> clr.also { assert(false, { "clear/rewind operation here" }) }
+        pos == 0 -> this.also { assert(false, { "already flipped here" }) }
+        else -> fl.also { assert(false, { "needs flip" }) }
+    }
+
+/** flush and close the underlying socket
+ */
+fun SelectionKey.close() {
+    flush().socket.close()
+}
+
+suspend operator fun <E> Channel<E>.plus(read: E) = send(read)
+/**
+ * returns ZERO_BUFFER on overflow
+ */
+fun SelectionKey.read(payload: ByteBuffer = allocateDirect(512),
+                      socketChannel: SocketChannel = channel() as SocketChannel): ByteBuffer {
+    var read: Int = -1
+    try {
+        read = socketChannel.read(payload)
+    } catch (e: Throwable) {
+        this -= SelectionKey.OP_READ
+    }
+    return if (0 < read) payload
+    else ZERO_BUFFER
+
+}

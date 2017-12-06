@@ -1,9 +1,6 @@
 package  one.xio
 
-import java.lang.Character.*
-import java.net.*
 import java.nio.*
-import java.nio.charset.*
 
 /**
  * iana http headers produced from shell command below.
