@@ -139,7 +139,10 @@ fun http1_1_Acceptor(it: SelectionKey) {
                             simpleresponse(`404`)
                     }
 
-                    else -> debug("method is $method")
+                    else -> {
+                        debug("method is $method")
+                        newKey.simpleresponse(`400`)
+                    }
                 }
             }
         }
