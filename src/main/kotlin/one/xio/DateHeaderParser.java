@@ -34,10 +34,13 @@ public enum DateHeaderParser {
   /**
    * Date format pattern used to parse HTTP date headers in ANSI C <code>asctime()</code> format.
    */
-  ISO8601("yyyy-MM-dd'T'HH:mm:ssz"), ISOMS("yyyy-MM-dd'T'HH:mm:ss.SSS zzz"), SHORT(DateFormat
-      .getDateInstance(DateFormat.SHORT)), MED(DateFormat.getDateInstance(DateFormat.MEDIUM)), LONG(
-      DateFormat.getDateInstance(DateFormat.LONG)), FULL(DateFormat
-      .getDateInstance(DateFormat.FULL)), ASCTIME("EEE MMM d HH:mm:ss yyyy"), ;
+  ISO8601("yyyy-MM-dd'T'HH:mm:ssz"),
+  ISOMS("yyyy-MM-dd'T'HH:mm:ss.SSS zzz"),
+  SHORT(DateFormat.getDateInstance(DateFormat.SHORT)),
+  MED(DateFormat.getDateInstance(DateFormat.MEDIUM)),
+  LONG(DateFormat.getDateInstance(DateFormat.LONG)),
+  FULL(DateFormat.getDateInstance(DateFormat.FULL)),
+  ASCTIME("EEE MMM d HH:mm:ss yyyy"), ;
   private final DateFormat format;
 
   DateHeaderParser(String fmt) {
@@ -50,8 +53,11 @@ public enum DateHeaderParser {
     format = dateFormat;
     format.setLenient(true);
     // for unit tests we want GMT as predictable. for other println's we want local tz
-    if (false)
+    try{assert(false);
+  }catch (AssertionError assertionError){
       format.setTimeZone(TimeZone.getTimeZone("GMT"));
+
+    }
   }
 
   /**

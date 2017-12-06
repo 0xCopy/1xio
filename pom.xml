@@ -8,7 +8,7 @@
     <modelVersion>4.0.0</modelVersion>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <kotlin.version>1.2.0-rc-84</kotlin.version>
+        <kotlin.version>1.2.0 </kotlin.version>
         <junit.version>4.12</junit.version>
     </properties>
     <dependencies>
@@ -20,7 +20,7 @@
         <dependency>
             <groupId>org.jetbrains.kotlinx</groupId>
             <artifactId>kotlinx-coroutines-core</artifactId>
-            <version>0.19.3</version>
+            <version>LATEST</version>
         </dependency>
      </dependencies>
     <repositories>
@@ -89,8 +89,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
         </plugins>

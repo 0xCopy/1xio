@@ -579,5 +579,11 @@ enum class HttpHeaders {
         set(value) {
             _tokenLen = value
         }
+
+    operator fun plus(hdrVal: String): ByteBuffer {
+             return "${name}: $hdrVal\r\n".buf
+
+
+    }
 }
 
