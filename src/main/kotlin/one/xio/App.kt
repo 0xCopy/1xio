@@ -126,10 +126,7 @@ fun http1_1_Acceptor(it: SelectionKey) {
                                     MimeType.valueOf(path1.toString().split('.').last()) ?: MimeType.bin).contentType
                             simpleresponse(
                                     `200`,
-                                    {
-                                        channel.use { channel.close() }
-                                        newKey.close()
-                                    },
+                                    SelectionKey::close,
                                     `Content-Length` + clen,
                                     `Content-Type` + contentType,
                                     "\r\n".buf,
